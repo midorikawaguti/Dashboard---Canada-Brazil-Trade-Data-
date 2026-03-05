@@ -7,8 +7,9 @@ cat > .gitignore << 'EOF'
 *.pdf
 *.png
 
-# Dataset folder
-Dataset/
+# Dataset folder — ignore everything except reference file
+Dataset/**
+!Dataset/hs_classification.csv
 
 # Python clutter
 __pycache__/
@@ -33,4 +34,4 @@ env/
 # Temporary files
 ~$*
 *.tmp
-EOF
+EOF!Dataset/hs_classification.csv
