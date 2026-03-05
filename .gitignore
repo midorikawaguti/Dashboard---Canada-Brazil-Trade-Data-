@@ -1,0 +1,36 @@
+cat > .gitignore << 'EOF'
+# Data files — never commit these
+*.csv
+!hs_classification.csv
+*.xlsx
+*.xls
+*.pdf
+*.png
+
+# Dataset folder
+Dataset/
+
+# Python clutter
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Virtual environments
+.env
+venv/
+env/
+.conda/
+
+# VS Code settings
+.vscode/
+
+# Mac system files
+.DS_Store
+.AppleDouble
+
+# Temporary files
+~$*
+*.tmp
+EOF
