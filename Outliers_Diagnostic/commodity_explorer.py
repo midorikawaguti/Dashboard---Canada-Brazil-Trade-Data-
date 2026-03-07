@@ -659,6 +659,24 @@ tr.row-low  td:first-child{border-left:2px solid var(--teal)}
 <script>
 const DATA = %%DATA%%;
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+const fmtP  = v => v == null ? '—' : (v >= 1000 ? '$' + v.toLocaleString('en-CA',{maximumFractionDigits:0}) : '$' + v.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:4}));
+const fmtV  = v => v == null ? '—' : (v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(0)+'K' : '$'+v.toFixed(0));
+const fmtN  = v => v == null ? '—' : v.toLocaleString('en-CA');
+const pct   = (n,d) => d > 0 ? (n/d*100).toFixed(1)+'%' : '0%';
+
+const S = DATA.stats;
+const tip = document.getElementById('tip');
+function showTip(e, range, body) {
+  tip.style.display = 'block';
+  tip.querySelector('.tr').textContent = range;
+  tip.querySelector('.tc').innerHTML = body;
+}
+document.addEventListener('mousemove', e => {
+  if (tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px'}
+});
+document.addEventListener('mouseleave', () => tip.style.display='none');
+
 // ── ZERO QTY SECTION ─────────────────────────────────────────────────────────
 (function(){
   const ZQ = DATA.zero_qty_info || {};
@@ -750,23 +768,6 @@ const DATA = %%DATA%%;
   twoCol.innerHTML = ctryHtml + yearHtml;
 })();
 
-
-const fmtP  = v => v == null ? '—' : (v >= 1000 ? '$' + v.toLocaleString('en-CA',{maximumFractionDigits:0}) : '$' + v.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:4}));
-const fmtV  = v => v == null ? '—' : (v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(0)+'K' : '$'+v.toFixed(0));
-const fmtN  = v => v == null ? '—' : v.toLocaleString('en-CA');
-const pct   = (n,d) => d > 0 ? (n/d*100).toFixed(1)+'%' : '0%';
-
-const S = DATA.stats;
-const tip = document.getElementById('tip');
-function showTip(e, range, body) {
-  tip.style.display = 'block';
-  tip.querySelector('.tr').textContent = range;
-  tip.querySelector('.tc').innerHTML = body;
-}
-document.addEventListener('mousemove', e => {
-  if (tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px'}
-});
-document.addEventListener('mouseleave', () => tip.style.display='none');
 
 // ── KPI ───────────────────────────────────────────────────────────────────────
 (function(){
