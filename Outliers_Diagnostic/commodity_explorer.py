@@ -154,7 +154,9 @@ def compute(df: pd.DataFrame, commodity: str) -> dict:
             "total": total, "n_valid": n_valid, "n_blank": n_blank,
             "n_zero_qty": n_zero_qty, "n_no_price": n_no_price, "n_no_value": n_no_value,
             "uom": uom_list, "base_units": base_unit_list,
-            "sufficient": False, "stats": {}, "hist": [], "outliers": [], "rows": []
+            "sufficient": False, "stats": {}, "hist": [], "outliers": [], "rows": [],
+            "zero_qty_info": {"count": n_zero_qty, "pct": round(n_zero_qty/total*100,1) if total>0 else 0,
+                              "value_excl": 0, "n_countries": 0, "countries": [], "by_year": []},
         }
 
     prices = valid["_unit_price"]
@@ -236,6 +238,49 @@ def compute(df: pd.DataFrame, commodity: str) -> dict:
             "n_high": n_high,
         })
 
+    # ── Zero-qty breakdown ────────────────────────────────────────────────────
+    zero_rows = sub[sub["_validity"] == "zero_qty"].copy()
+    zq_total_rows  = len(sub)
+    zq_count       = len(zero_rows)
+    zq_pct         = round(zq_count / zq_total_rows * 100, 1) if zq_total_rows > 0 else 0
+
+    # Value excluded: sum of Value ($) for zero_qty rows
+    zq_value_excl  = round(float(zero_rows["Value ($)"].sum()), 0) if "Value ($)" in zero_rows.columns else 0
+
+    # Countries affected
+    if "Country" in zero_rows.columns and zq_count > 0:
+        zq_ctry = (zero_rows.groupby("Country", dropna=False)
+                   .agg(n=("Country", "count"))
+                   .reset_index()
+                   .sort_values("n", ascending=False))
+        zq_ctry["pct"] = (zq_ctry["n"] / zq_count * 100).round(1)
+        zq_countries = zq_ctry.to_dict("records")
+        zq_n_countries = int(zero_rows["Country"].nunique())
+    else:
+        zq_countries  = []
+        zq_n_countries = 0
+
+    # Year/period concentration
+    if "Period" in zero_rows.columns and zq_count > 0:
+        zero_rows["_year"] = zero_rows["Period"].astype(str).str[:4]
+        zq_year = (zero_rows.groupby("_year", dropna=False)
+                   .agg(n=("_year", "count"))
+                   .reset_index()
+                   .sort_values("_year"))
+        zq_year["pct"] = (zq_year["n"] / zq_count * 100).round(1)
+        zq_by_year = zq_year.rename(columns={"_year": "year"}).to_dict("records")
+    else:
+        zq_by_year = []
+
+    zero_qty_info = {
+        "count":        zq_count,
+        "pct":          zq_pct,
+        "value_excl":   zq_value_excl,
+        "n_countries":  zq_n_countries,
+        "countries":    zq_countries[:15],   # top 15
+        "by_year":      zq_by_year,
+    }
+
     # ── All valid rows for the row table ─────────────────────────────────────
     keep_cols = [
         "Period", "Country", "Province", "Quantity",
@@ -293,6 +338,7 @@ def compute(df: pd.DataFrame, commodity: str) -> dict:
         "outliers": outlier_rows,
         "countries": country_list,
         "rows": rows_list,
+        "zero_qty_info": zero_qty_info,
     }
 
 
@@ -479,7 +525,24 @@ tr.row-low  td:first-child{border-left:2px solid var(--teal)}
 .ctry-rank{font-family:'Bricolage Grotesque',sans-serif;font-size:11px;font-weight:300;
   color:var(--ink3);width:22px;text-align:right;flex-shrink:0}
 
-.toggle-btn{background:none;border:1px solid var(--border2);color:var(--ink3);
+/* ── ZERO QTY SECTION ── */
+.zq-banner{padding:18px 22px 16px;border-left:4px solid var(--amber);background:var(--amb-bg);margin-bottom:16px}
+.zq-banner-clean{border-color:var(--green);background:var(--grn-bg)}
+.zq-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border2);border:1px solid var(--border2);margin-bottom:16px}
+.zq-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.zq-ctry-row{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(92,84,72,.06);font-size:11.5px}
+.zq-ctry-row:last-child{border-bottom:none}
+.zq-bar-bg{height:4px;background:var(--bg3);border-radius:2px;margin-top:4px}
+.zq-bar-fill{height:100%;background:var(--amber);opacity:.55;border-radius:2px}
+.zq-year-chart{padding:16px 18px}
+.zq-year-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:11px}
+.zq-year-label{width:40px;color:var(--ink3);flex-shrink:0}
+.zq-year-bar-bg{flex:1;height:14px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.zq-year-bar-fill{height:100%;background:var(--amber);opacity:.5;border-radius:2px;transition:width .4s}
+.zq-year-count{width:55px;text-align:right;color:var(--ink2);flex-shrink:0}
+.zq-year-pct{width:36px;text-align:right;color:var(--ink3);flex-shrink:0}
+
+
   font-family:'DM Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
   padding:6px 14px;cursor:pointer;transition:all .2s}
 .toggle-btn:hover{border-color:var(--ink);color:var(--ink)}
@@ -503,6 +566,14 @@ tr.row-low  td:first-child{border-left:2px solid var(--teal)}
 </div>
 
 <div class="page">
+
+<!-- ZERO QTY SECTION -->
+<div class="section" id="zq-section">
+  <div class="eyebrow">Missing quantity — data coverage note</div>
+  <div id="zq-banner"></div>
+  <div class="zq-kpi-row" id="zq-kpi-row"></div>
+  <div class="zq-two-col" id="zq-two-col"></div>
+</div>
 
 <!-- KPI -->
 <div class="section">
@@ -588,7 +659,98 @@ tr.row-low  td:first-child{border-left:2px solid var(--teal)}
 <script>
 const DATA = %%DATA%%;
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── ZERO QTY SECTION ─────────────────────────────────────────────────────────
+(function(){
+  const ZQ = DATA.zero_qty_info || {};
+  const count      = ZQ.count || 0;
+  const pct        = ZQ.pct || 0;
+  const valExcl    = ZQ.value_excl || 0;
+  const nCtry      = ZQ.n_countries || 0;
+  const countries  = ZQ.countries || [];
+  const byYear     = ZQ.by_year || [];
+
+  // Banner
+  const banner = document.getElementById('zq-banner');
+  if (count === 0) {
+    banner.innerHTML = `<div class="zq-banner zq-banner-clean">
+      <strong style="color:var(--green)">✓ No missing-quantity rows</strong> — all rows for this commodity have a valid quantity. No data was excluded on this basis.
+    </div>`;
+  } else {
+    banner.innerHTML = `<div class="zq-banner">
+      <strong class="hl-amb">Missing-quantity rows detected.</strong>
+      ${fmtN(count)} rows (${pct}% of all rows) have <code>Quantity = 0</code> with a real unit of measure — unit price cannot be computed for these rows and they are <strong>excluded from all price analysis</strong> below.
+      ${valExcl > 0 ? `Total export value in excluded rows: <strong class="hl-amb">${fmtV(valExcl)}</strong>.` : ''}
+    </div>`;
+  }
+
+  if (count === 0) {
+    document.getElementById('zq-kpi-row').style.display = 'none';
+    document.getElementById('zq-two-col').style.display = 'none';
+    return;
+  }
+
+  // KPI row
+  const kpiEl = document.getElementById('zq-kpi-row');
+  const kpis = [
+    {v: fmtN(count),         l: 'Zero-qty rows',         cls: 'amber'},
+    {v: pct + '%',           l: '% of all rows',         cls: pct > 20 ? 'red' : 'amber'},
+    {v: fmtV(valExcl),       l: 'Value excluded (CAD)',  cls: valExcl > 1e6 ? 'amber' : ''},
+    {v: fmtN(nCtry),         l: 'Countries affected',    cls: ''},
+  ];
+  kpis.forEach(k => {
+    kpiEl.innerHTML += `<div class="kpi"><div class="kpi-v ${k.cls}">${k.v}</div><div class="kpi-l">${k.l}</div></div>`;
+  });
+
+  // Two-col: countries + year breakdown
+  const twoCol = document.getElementById('zq-two-col');
+
+  // Countries panel
+  let ctryHtml = `<div class="panel">
+    <div class="panel-hdr">Countries affected (top ${Math.min(countries.length,15)} by zero-qty rows)</div>`;
+  if (countries.length === 0) {
+    ctryHtml += `<div class="uom-row" style="color:var(--ink3)">No country data available</div>`;
+  } else {
+    const maxN = Math.max(...countries.map(c => c.n));
+    countries.forEach(c => {
+      const w = maxN > 0 ? Math.round(c.n / maxN * 100) : 0;
+      ctryHtml += `<div class="zq-ctry-row">
+        <div>
+          <div style="font-weight:500">${c.Country || '—'}</div>
+          <div class="zq-bar-bg" style="width:${Math.max(w,2)}%"><div class="zq-bar-fill" style="width:100%"></div></div>
+        </div>
+        <div style="text-align:right;min-width:70px">
+          <div>${fmtN(c.n)}</div>
+          <div style="color:var(--ink3);font-size:10.5px">${c.pct}%</div>
+        </div>
+      </div>`;
+    });
+  }
+  ctryHtml += `</div>`;
+
+  // Year chart panel
+  let yearHtml = `<div class="panel">
+    <div class="panel-hdr">Year / period concentration</div>
+    <div class="zq-year-chart">`;
+  if (byYear.length === 0) {
+    yearHtml += `<div style="color:var(--ink3);font-size:11.5px;padding:8px 0">No period data available</div>`;
+  } else {
+    const maxYN = Math.max(...byYear.map(y => y.n));
+    byYear.forEach(y => {
+      const w = maxYN > 0 ? Math.round(y.n / maxYN * 100) : 0;
+      yearHtml += `<div class="zq-year-row">
+        <div class="zq-year-label">${y.year || '—'}</div>
+        <div class="zq-year-bar-bg"><div class="zq-year-bar-fill" style="width:${w}%"></div></div>
+        <div class="zq-year-count">${fmtN(y.n)}</div>
+        <div class="zq-year-pct">${y.pct}%</div>
+      </div>`;
+    });
+  }
+  yearHtml += `</div></div>`;
+
+  twoCol.innerHTML = ctryHtml + yearHtml;
+})();
+
+
 const fmtP  = v => v == null ? '—' : (v >= 1000 ? '$' + v.toLocaleString('en-CA',{maximumFractionDigits:0}) : '$' + v.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:4}));
 const fmtV  = v => v == null ? '—' : (v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(0)+'K' : '$'+v.toFixed(0));
 const fmtN  = v => v == null ? '—' : v.toLocaleString('en-CA');
