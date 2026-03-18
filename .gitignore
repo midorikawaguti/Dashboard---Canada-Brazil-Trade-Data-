@@ -1,6 +1,7 @@
 cat > .gitignore << 'EOF'
 # Data files — never commit these
 *.csv
+*.parquet
 !hs_classification.csv
 *.xlsx
 *.xls
