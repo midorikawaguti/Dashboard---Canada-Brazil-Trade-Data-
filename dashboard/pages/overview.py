@@ -5,6 +5,7 @@ from ..styles import (
     STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY,
     FONT_MAIN,TABLE_STYLE_TABLE, TABLE_STYLE_HEADER,       
     TABLE_STYLE_CELL, TABLE_STYLE_DATA_CONDITIONAL,
+    FIGURE_TITLE, FIGURE_DESCRIPTION
 )
 
 
@@ -53,29 +54,38 @@ def layout():
 
          # ── Charts row 1 ───────────────────────────────────────────────────
         html.Div(
-            html.Div(dcc.Graph(id='monthly-trade'), style=STYLE_CHART_ITEM),
-         style=STYLE_CHART_ROW),
+            html.Div(
+                style=STYLE_CHART_ITEM,
+                children=[
+                    # ── Chart title ───────────────────────────────
+                        html.H4('Trade Trend', style=FIGURE_TITLE),
+                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+
+                    dcc.Graph(id='monthly-trade'),
+                ]),
+                style=STYLE_CHART_ROW),
 
                 # ── Charts row 2 — Top 10 chart + table ───────────────────────────
         html.Div([
-            html.Div(dcc.Graph(id='top-countries'), style={**STYLE_CHART_ITEM, 'flex': '1.2'}),
+            html.Div(
+                style={**STYLE_CHART_ITEM, 'flex': '1.2'},
+                children=[
+                    # ── Chart title ───────────────────────────────
+                        html.H4('Top 10 Trading Partners', style=FIGURE_TITLE
+                                ),
+                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+
+                        dcc.Graph(id='top-countries')
+                        ]         
+                    ),
+            
+            
             html.Div(
                 style={**STYLE_CHART_ITEM, 'flex': '0.8'},
                 children=[
                     # ── Table title ───────────────────────────────
-                    html.H4('Top 10 Trading Partners', style={
-                        'margin':     '0 0 8px 0',
-                        'color':      BLUE_ACCENT,
-                        'fontFamily': FONT_MAIN,
-                        'fontSize':   '16px',
-                        'fontWeight': 'bold',
-                    }),
-                    html.P('Share of total Canada trade by country', style={
-                        'margin':     '0 0 12px 0',
-                        'color':      TEXT_GRAY,
-                        'fontSize':   '12px',
-                        'fontStyle':  'italic',
-                    }),
+                    html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
+                    html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
                     # ── Table ─────────────────────────────────────
                     dash_table.DataTable(
                         id='top-countries-table',
