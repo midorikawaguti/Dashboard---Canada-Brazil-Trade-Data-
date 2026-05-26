@@ -62,6 +62,21 @@ def layout():
             html.Div(
                 style={**STYLE_CHART_ITEM, 'flex': '0.8'},
                 children=[
+                    # ── Table title ───────────────────────────────
+                    html.H4('Top 10 Trading Partners', style={
+                        'margin':     '0 0 8px 0',
+                        'color':      BLUE_ACCENT,
+                        'fontFamily': FONT_MAIN,
+                        'fontSize':   '16px',
+                        'fontWeight': 'bold',
+                    }),
+                    html.P('Share of total Canada trade by country', style={
+                        'margin':     '0 0 12px 0',
+                        'color':      TEXT_GRAY,
+                        'fontSize':   '12px',
+                        'fontStyle':  'italic',
+                    }),
+                    # ── Table ─────────────────────────────────────
                     dash_table.DataTable(
                         id='top-countries-table',
                         columns=[
