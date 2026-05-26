@@ -165,3 +165,19 @@ TABLE_STYLE_DATA_CONDITIONAL = [
         'paddingLeft': '16px',
     },
 ]
+
+
+FIGURE_TITLE={
+            'margin':     '0 0 8px 0',
+            'color':      BLUE_ACCENT,
+            'fontFamily': FONT_MAIN,
+            'fontSize':   '18px',
+            'fontWeight': 'bold',
+        }
+
+FIGURE_DESCRIPTION = {
+            'margin':     '0 0 12px 0',
+            'color':      TEXT_GRAY,
+            'fontSize':   '12px',
+            'fontStyle':  'italic',
+        }
