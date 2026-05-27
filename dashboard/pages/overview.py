@@ -2,8 +2,8 @@ from dash import html, dcc, dash_table
 
 from ..styles import (
     KPI_STYLE_ROW, KPI_STYLE_BOX, STYLE_CHART_ROW,
-    STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY,
-    FONT_MAIN,TABLE_STYLE_TABLE, TABLE_STYLE_HEADER,       
+    STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY, DARK_GREEN, WHITE,
+    FONT_MAIN, TABLE_STYLE_TABLE, TABLE_STYLE_HEADER,
     TABLE_STYLE_CELL, TABLE_STYLE_DATA_CONDITIONAL,
     FIGURE_TITLE, FIGURE_DESCRIPTION
 )
@@ -51,67 +51,181 @@ def layout():
             ]
         ),
 
-
-         # ── Charts row 1 ───────────────────────────────────────────────────
+        # ── Row 1 — Monthly trade chart ────────────────────────────────────────
         html.Div(
-            html.Div(
-                style=STYLE_CHART_ITEM,
-                children=[
-                    # ── Chart title ───────────────────────────────
+            style=STYLE_CHART_ROW,
+            children=[
+                html.Div(
+                    style=STYLE_CHART_ITEM,
+                    children=[
                         html.H4('Trade Trend', style=FIGURE_TITLE),
-                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+                        html.P('Monthly exports and imports over time', style=FIGURE_DESCRIPTION),
+                        dcc.Graph(id='monthly-trade'),
+                    ]
+                ),
+            ]
+        ),
 
-                    dcc.Graph(id='monthly-trade'),
-                ]),
-                style=STYLE_CHART_ROW),
-
-                # ── Charts row 2 — Top 10 chart + table ───────────────────────────
-        html.Div([
-            html.Div(
-                style={**STYLE_CHART_ITEM, 'flex': '1.2'},
-                children=[
-                    # ── Chart title ───────────────────────────────
-                        html.H4('Top 10 Trading Partners', style=FIGURE_TITLE
-                                ),
-                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
-
-                        dcc.Graph(id='top-countries')
-                        ]         
-                    ),
-            
-            
-            html.Div(
-                style={**STYLE_CHART_ITEM, 'flex': '0.8'},
-                children=[
-                    # ── Table title ───────────────────────────────
-                    html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
-                    html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
-                    # ── Table ─────────────────────────────────────
-                    dash_table.DataTable(
-                        id='top-countries-table',
-                        columns=[
-                            {'name': '#',           'id': '#'},
-                            {'name': 'Country',     'id': 'Country'},
-                            {'name': 'Exports',     'id': 'Exports'},
-                            {'name': 'Imports',     'id': 'Imports'},
-                            {'name': 'Total Trade', 'id': 'Total Trade'},
-                            {'name': 'Share %',     'id': 'Share %'},
-                        ],
-                        data=[],
-                        style_table=TABLE_STYLE_TABLE,
-                        style_header=TABLE_STYLE_HEADER,
-                        style_cell=TABLE_STYLE_CELL,
-                        style_data_conditional=TABLE_STYLE_DATA_CONDITIONAL,
-                        page_size=10,
-                    )
-                ]
-            ),
-        ], style=STYLE_CHART_ROW),
-
-
-        # ── Charts row 3 ───────────────────────────────────────────────────
+        
+        # ── Row 2 — Top 10 chart + table ───────────────────────────────────────
         html.Div(
-            html.Div(dcc.Graph(id='monthly-trade-2'), style=STYLE_CHART_ITEM),
-         style=STYLE_CHART_ROW),
+            style=STYLE_CHART_ROW,
+            children=[
 
-    ])
+                # html.Div(
+                #     style={**STYLE_CHART_ITEM, 'flex': '1.2'},
+                #     children=[
+                #         html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
+                #         html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+                #         dcc.Graph(id='top-countries'),
+                #     ]
+                # ),
+                # HS2 share chart
+                html.Div(
+                    style=
+                        STYLE_CHART_ITEM,
+                    children=[
+                        html.H4('Trade Share by HS2 Category', style=FIGURE_TITLE),
+                        html.P('% of total trade value', style=FIGURE_DESCRIPTION),
+                        dcc.Graph(id='hs2-share-chart',
+                                  config={'displayModeBar': False}),
+                    ]
+                ),
+
+                html.Div(
+                    style={**STYLE_CHART_ITEM, 'flex': '0.8'},
+                    children=[
+                        html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
+                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+                        dash_table.DataTable(
+                            id='top-countries-table',
+                            columns=[
+                                {'name': '#',           'id': '#'},
+                                {'name': 'Country',     'id': 'Country'},
+                                {'name': 'Exports',     'id': 'Exports'},
+                                {'name': 'Imports',     'id': 'Imports'},
+                                {'name': 'Total Trade', 'id': 'Total Trade'},
+                                {'name': 'Share %',     'id': 'Share %'},
+                            ],
+                            data=[],
+                            style_table=TABLE_STYLE_TABLE,
+                            style_header=TABLE_STYLE_HEADER,
+                            style_cell=TABLE_STYLE_CELL,
+                            style_data_conditional=TABLE_STYLE_DATA_CONDITIONAL,
+                            page_size=10,
+                        ),
+                    ]
+                ),
+
+            ]
+        ),
+
+        # ── Row 3 — Top 5 tables + HS2 share chart ────────────────────────────
+        html.Div(
+            style={**STYLE_CHART_ROW, 'alignItems': 'flex-start'},
+            children=[
+
+                # Top 5 Exports table
+                html.Div(
+                    style={
+                        **STYLE_CHART_ITEM,
+                        'backgroundColor': WHITE,
+                        'borderRadius':    '10px',
+                        'padding':         '16px',
+                        'boxShadow':       '0 2px 8px rgba(0,0,0,0.08)',
+                    },
+                    children=[
+                        html.H4('Top 5 Exports', style=FIGURE_TITLE),
+                        dash_table.DataTable(
+                            id='top5-export-table',
+                            columns=[
+                                {'name': 'COMMODITY', 'id': 'Commodity'},
+                                {'name': 'VALUE',     'id': 'Value'},
+                                {'name': 'YOY',       'id': 'YoY'},
+                            ],
+                            data=[],
+                            style_table={'border': 'none'},
+                            style_header={
+                                **TABLE_STYLE_HEADER,
+                                'backgroundColor': WHITE,
+                                'color':           TEXT_GRAY,
+                                'fontWeight':      'bold',
+                                'fontSize':        '11px',
+                                'letterSpacing':   '0.5px',
+                            },
+                            style_cell={**TABLE_STYLE_CELL, 'fontSize': '13px'},
+                            style_data_conditional=[
+                                {'if': {'row_index': 'odd'},
+                                 'backgroundColor': '#F5F8FC'},
+                                {'if': {'filter_query': '{_yoy_val} > 0',
+                                        'column_id': 'YoY'},
+                                 'color': '#2d6a4f', 'fontWeight': 'bold'},
+                                {'if': {'filter_query': '{_yoy_val} < 0',
+                                        'column_id': 'YoY'},
+                                 'color': '#C00000', 'fontWeight': 'bold'},
+                            ],
+                            page_size=5,
+                        ),
+                    ]
+                ),
+
+                # Top 5 Imports table
+                html.Div(
+                    style={
+                        **STYLE_CHART_ITEM,
+                        'backgroundColor': WHITE,
+                        'borderRadius':    '10px',
+                        'padding':         '16px',
+                        'boxShadow':       '0 2px 8px rgba(0,0,0,0.08)',
+                    },
+                    children=[
+                        html.H4('Top 5 Imports', style=FIGURE_TITLE),
+                        dash_table.DataTable(
+                            id='top5-import-table',
+                            columns=[
+                                {'name': 'COMMODITY', 'id': 'Commodity'},
+                                {'name': 'VALUE',     'id': 'Value'},
+                                {'name': 'YOY',       'id': 'YoY'},
+                            ],
+                            data=[],
+                            style_table={'border': 'none'},
+                            style_header={
+                                **TABLE_STYLE_HEADER,
+                                'backgroundColor': WHITE,
+                                'color':           TEXT_GRAY,
+                                'fontWeight':      'bold',
+                                'fontSize':        '11px',
+                                'letterSpacing':   '0.5px',
+                            },
+                            style_cell={**TABLE_STYLE_CELL, 'fontSize': '13px'},
+                            style_data_conditional=[
+                                {'if': {'row_index': 'odd'},
+                                 'backgroundColor': '#F5F8FC'},
+                                {'if': {'filter_query': '{_yoy_val} > 0',
+                                        'column_id': 'YoY'},
+                                 'color': '#2d6a4f', 'fontWeight': 'bold'},
+                                {'if': {'filter_query': '{_yoy_val} < 0',
+                                        'column_id': 'YoY'},
+                                 'color': '#C00000', 'fontWeight': 'bold'},
+                            ],
+                            page_size=5,
+                        ),
+                    ]
+                ),
+
+                # # HS2 share chart
+                # html.Div(
+                #     style=
+                #         STYLE_CHART_ITEM,
+                #     children=[
+                #         html.H4('Trade Share by HS2 Category', style=FIGURE_TITLE),
+                #         html.P('% of total trade value', style=FIGURE_DESCRIPTION),
+                #         dcc.Graph(id='hs2-share-chart',
+                #                   config={'displayModeBar': False}),
+                #     ]
+                # ),
+
+            ]
+        ),
+
+    ])  # ← end of return html.Div

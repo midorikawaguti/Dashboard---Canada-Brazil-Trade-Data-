@@ -2,7 +2,7 @@ from dash import html, Input, Output
 
 from .data import df, df_kpi, period_index
 from .utils import apply_filters, fmt_value
-from .charts import build_monthly_chart, build_top_countries, build_top_countries_table
+from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart
 from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT
 from .pages import overview, products, geography
 
@@ -50,6 +50,8 @@ def register_callbacks(app):
         Output('total-export',  'children'),
         Output('total-import',  'children'),
         Output('trade-balance', 'children'),
+
+
         Input('period-slider', 'value'),
         Input('hs2-dropdown', 'value'),
         Input('province-dropdown', 'value'),
@@ -85,8 +87,12 @@ def register_callbacks(app):
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(
         Output('monthly-trade',  'figure'),
-        Output('top-countries',  'figure'),
+        #Output('top-countries',  'figure'),
         Output('top-countries-table', 'data'),
+        Output('top5-export-table',   'data'),     
+        Output('top5-import-table',   'data'),     
+        Output('hs2-share-chart',     'figure'),
+
         Input('period-slider',      'value'),
         Input('hs2-dropdown', 'value'),
         Input('province-dropdown',  'value'),
@@ -99,9 +105,14 @@ def register_callbacks(app):
                                  selected_province, selected_country,
                                  period_index=period_index)
 
+        export_records, import_records = build_top5_tables(filtered)
+        
         return (build_monthly_chart(filtered), 
-                build_top_countries(filtered), 
-                build_top_countries_table(filtered))
+                #build_top_countries(filtered), 
+                build_top_countries_table(filtered),
+                export_records,                        
+                import_records,                        
+                build_hs2_share_chart(filtered) )      
 
     # ── Products callbacks (add here as you build the Products page) ──────────
     # @app.callback(

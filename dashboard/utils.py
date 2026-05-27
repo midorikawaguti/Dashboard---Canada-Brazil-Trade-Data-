@@ -70,7 +70,7 @@ HS2_LABELS = {
     "68": "Stone, Cement & Abrasive Articles",
     "69": "Ceramic Products",
     "70": "Glass & Glassware",
-    "71": "Precious Stones, Metals & Jewellery (Pearls, diamonds, rubies, sapphires, gold, silver, platinum)",
+    "71": "Precious Stones, Metals & Jewellery",
     "72": "Iron & Steel",
     "73": "Iron & Steel Articles",
     "74": "Copper & Copper Articles",

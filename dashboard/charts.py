@@ -138,60 +138,57 @@ def build_monthly_chart(filtered_df):
 
 
 # ── Add new chart functions below as you build new pages ──────────────────────
-# def build_top_products(filtered_df): ...
-# def build_province_map(filtered_df): ...
-# def build_country_breakdown(filtered_df): ...
 
-def build_top_countries(filtered_df):
-    top_countries = (
-        filtered_df
-        .groupby(['Country', 'trade_type'], observed=True)['Value ($)']
-        .sum()
-        .reset_index()
-    )
-    top10 = (
-        top_countries.groupby('Country', observed=True)['Value ($)']
-        .sum()
-        .nlargest(10)
-        .reset_index()
-    )
-    top_countries = top_countries[top_countries['Country'].isin(top10['Country'])]
-    top_countries = top_countries.sort_values('Value ($)', ascending=True)
+# def build_top_countries(filtered_df):
+#     top_countries = (
+#         filtered_df
+#         .groupby(['Country', 'trade_type'], observed=True)['Value ($)']
+#         .sum()
+#         .reset_index()
+#     )
+#     top10 = (
+#         top_countries.groupby('Country', observed=True)['Value ($)']
+#         .sum()
+#         .nlargest(10)
+#         .reset_index()
+#     )
+#     top_countries = top_countries[top_countries['Country'].isin(top10['Country'])]
+#     top_countries = top_countries.sort_values('Value ($)', ascending=True)
 
-    fig = go.Figure()
+#     fig = go.Figure()
 
-    fig.add_trace(go.Bar(
-        x=top_countries[top_countries['trade_type'] == 'Export']['Value ($)'],
-        y=top_countries[top_countries['trade_type'] == 'Export']['Country'],
-        name='Exports',
-        orientation='h',
-        marker_color='#458098',
-    ))
-    fig.add_trace(go.Bar(
-        x=top_countries[top_countries['trade_type'] == 'Import']['Value ($)'],
-        y=top_countries[top_countries['trade_type'] == 'Import']['Country'],
-        name='Imports',
-        orientation='h',
-        marker_color='#183662',
-    ))
+#     fig.add_trace(go.Bar(
+#         x=top_countries[top_countries['trade_type'] == 'Export']['Value ($)'],
+#         y=top_countries[top_countries['trade_type'] == 'Export']['Country'],
+#         name='Exports',
+#         orientation='h',
+#         marker_color='#458098',
+#     ))
+#     fig.add_trace(go.Bar(
+#         x=top_countries[top_countries['trade_type'] == 'Import']['Value ($)'],
+#         y=top_countries[top_countries['trade_type'] == 'Import']['Country'],
+#         name='Imports',
+#         orientation='h',
+#         marker_color='#183662',
+#     ))
 
-    tick_vals = np.linspace(0, top_countries['Value ($)'].max(), 5)
+#     tick_vals = np.linspace(0, top_countries['Value ($)'].max(), 5)
 
-    fig.update_layout(
-        barmode='group',
-        title='Top 10 Countries by Trade Value',
-        xaxis=dict(
-            title='Trade Value (CAD)',
-            tickvals=tick_vals,
-            ticktext=[fmt_value(v) for v in tick_vals],
-        ),
-        yaxis=dict(title=''),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02),
-        template='plotly_white',
-        margin=dict(t=60, b=40),
-        height=400,
-    )
-    return fig
+#     fig.update_layout(
+#         barmode='group',
+#         title='Top 10 Countries by Trade Value',
+#         xaxis=dict(
+#             title='Trade Value (CAD)',
+#             tickvals=tick_vals,
+#             ticktext=[fmt_value(v) for v in tick_vals],
+#         ),
+#         yaxis=dict(title=''),
+#         legend=dict(orientation='h', yanchor='bottom', y=1.02),
+#         template='plotly_white',
+#         margin=dict(t=60, b=40),
+#         height=400,
+#     )
+#     return fig
 
 # ── Table 1  — Top Countries Share ──────────────────────────────────
 def build_top_countries_table(filtered_df):
@@ -232,3 +229,107 @@ def build_top_countries_table(filtered_df):
     })
 
     return table_df.to_dict('records')
+
+# ── Chart  ─────────────────────────────────
+def build_top5_tables(filtered_df):
+    """Returns (export_records, import_records) for the two mini tables."""
+    
+    # Get all periods for YoY calculation
+    all_periods = sorted(filtered_df['Period'].dt.to_period('M').unique())
+    
+    def get_top5(trade_type):
+        sub = filtered_df[filtered_df['trade_type'] == trade_type]
+        
+        # Total value per commodity
+        total = (
+            sub.groupby('Commodity', observed=True)['Value ($)']
+            .sum()
+            .nlargest(5)
+            .reset_index()
+        )
+        
+        # YoY — compare last year vs previous year
+        by_year = (
+            sub.groupby([sub['Period'].dt.year.rename('year'), 'Commodity'],
+                        observed=True)['Value ($)']
+            .sum().reset_index()
+        )
+        years = sorted(by_year['year'].unique())
+        
+        yoy_map = {}
+        if len(years) >= 2:
+            curr = by_year[by_year['year'] == years[-1]].set_index('Commodity')['Value ($)']
+            prev = by_year[by_year['year'] == years[-2]].set_index('Commodity')['Value ($)']
+            for c in total['Commodity']:
+                if c in curr.index and c in prev.index and prev[c] != 0:
+                    yoy_map[c] = ((curr[c] - prev[c]) / prev[c] * 100)
+                else:
+                    yoy_map[c] = None
+
+        records = []
+        for _, row in total.iterrows():
+            yoy = yoy_map.get(row['Commodity'])
+            yoy_str = f"+{yoy:.0f}%" if yoy and yoy >= 0 else (f"{yoy:.0f}%" if yoy else 'N/A')
+            # Shorten commodity name
+            name = str(row['Commodity'])[:20] + '...' if len(str(row['Commodity'])) > 20 else str(row['Commodity'])
+            records.append({
+                'Commodity': name,
+                'Value':     fmt_value(row['Value ($)']),
+                'YoY':       yoy_str,
+                '_yoy_val':  yoy,   # raw value for conditional colouring
+            })
+        return records
+
+    return get_top5('Export'), get_top5('Import')
+
+# ── Chart  ──────────────────────────────────
+def build_hs2_share_chart(filtered_df):
+    """Horizontal bar chart of % share by HS2 category."""
+    from .utils import HS2_LABELS
+
+    total_all = filtered_df['Value ($)'].sum()
+    if total_all == 0:
+        return go.Figure()
+
+    hs2 = (
+        filtered_df
+        .groupby('HS2', observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+    hs2['share'] = (hs2['Value ($)'] / total_all * 100).round(1)
+    hs2['label'] = hs2['HS2'].apply(lambda x: HS2_LABELS.get(str(x), str(x)))
+    hs2 = hs2.nlargest(10, 'share').sort_values('share')
+
+    # Colour scale — greens to oranges
+    colors = [
+    "#264653",  # deep blue-green
+    "#2A9D8F",  # teal
+    "#52B788",  # soft green
+    "#84A59D",  # sage
+    "#E9C46A",  # warm yellow
+    "#F4A261",  # sand orange
+    "#E76F51",  # coral
+    "#D62828",  # muted red
+    "#6D597A",  # dusty purple
+    "#457B9D",  # steel blue
+]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=hs2['share'],
+        y=hs2['label'],
+        orientation='h',
+        text=hs2['share'].apply(lambda x: f'{x}%'),
+        textposition='outside',
+        marker_color=colors[:len(hs2)],
+    ))
+
+    fig.update_layout(
+        xaxis=dict(visible=False),
+        yaxis=dict(tickfont=dict(size=12)),
+        margin=dict(l=0, r=0, t=10, b=10),
+        template='plotly_white',
+        showlegend=False,
+    )
+    return fig
