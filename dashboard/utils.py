@@ -116,7 +116,7 @@ def fmt_value(value):
 
 
 # ── Shared filter function ─────────────────────────────────────────────────────
-def apply_filters(df, period_range, selected_hs2, selected_province, selected_country, period_index=None):
+def apply_filters(df, period_range, selected_hs2, selected_province, selected_country, period_index=None, selected_trade_type=None):
     """
     Applies the four standard dropdown filters to any dataframe.
     Works with both df (has 'Year' column) and df_kpi (pre-aggregated).
@@ -140,5 +140,8 @@ def apply_filters(df, period_range, selected_hs2, selected_province, selected_co
 
     if selected_country and 'ALL' not in selected_country:
         filtered = filtered[filtered['Country'].isin(selected_country)]
+
+    if selected_trade_type and 'ALL' not in selected_trade_type:
+        filtered = filtered[filtered['trade_type'].isin(selected_trade_type)]
 
     return filtered

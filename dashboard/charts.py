@@ -87,6 +87,12 @@ def build_monthly_chart(filtered_df):
     ).fillna(0).reset_index()
     pivot.columns.name = None
     pivot = pivot.rename(columns={'Export': 'exports', 'Import': 'imports'})
+
+    if 'exports' not in pivot.columns:
+        pivot['exports'] = 0
+    if 'imports' not in pivot.columns:
+        pivot['imports'] = 0
+
     pivot['balance'] = pivot['exports'] - pivot['imports']
     pivot = pivot.sort_values(['year', 'month']).reset_index(drop=True)
     pivot['label'] = pivot.apply(

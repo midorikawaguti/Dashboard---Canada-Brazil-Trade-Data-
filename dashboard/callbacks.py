@@ -29,13 +29,16 @@ def register_callbacks(app):
         Output('hs2-dropdown', 'value'),
         Output('province-dropdown',  'value'),
         Output('country-dropdown',   'value'),
+        Output('trade-type-dropdown',    'value'),
       
         Input('hs2-dropdown',  'value'),
         Input('province-dropdown',   'value'),
         Input('country-dropdown',    'value'),
+        Input('trade-type-dropdown',    'value'),
+        
         prevent_initial_call=True,
     )
-    def enforce_all( hs2, province, country):
+    def enforce_all( hs2, province, country, trade_type):
         def fix(selected):
             if not selected:
                 return ['ALL']
@@ -43,7 +46,7 @@ def register_callbacks(app):
                 return [v for v in selected if v != 'ALL']
             return selected
 
-        return fix(hs2), fix(province), fix(country)
+        return fix(hs2), fix(province), fix(country), fix(trade_type)
 
     # ── Overview: KPI cards ───────────────────────────────────────────────────
     @app.callback(
@@ -56,11 +59,13 @@ def register_callbacks(app):
         Input('hs2-dropdown', 'value'),
         Input('province-dropdown', 'value'),
         Input('country-dropdown',  'value'),
+        Input('trade-type-dropdown',    'value'),
     )
-    def update_metrics(period_range, selected_hs2, selected_province, selected_country):
+    def update_metrics(period_range, selected_hs2, selected_province, selected_country, selected_trade_type):
         filtered = apply_filters(df_kpi, period_range, selected_hs2,
                                  selected_province, selected_country,
-                                 period_index=period_index)
+                                 period_index=period_index,
+                                 selected_trade_type=selected_trade_type)
 
         total_export  = filtered[filtered['trade_type'] == 'Export']['Value ($)'].sum()
         total_import  = filtered[filtered['trade_type'] == 'Import']['Value ($)'].sum()
@@ -97,13 +102,14 @@ def register_callbacks(app):
         Input('hs2-dropdown', 'value'),
         Input('province-dropdown',  'value'),
         Input('country-dropdown',   'value'),
+        Input('trade-type-dropdown',    'value'),
     )
-    def update_charts(period_range, selected_hs2, selected_province, selected_country):
+    def update_charts(period_range, selected_hs2, selected_province, selected_country, selected_trade_type):
         print('period_range:', period_range)
         # Charts need the full df (Period column for month grouping)
         filtered = apply_filters(df, period_range, selected_hs2,
                                  selected_province, selected_country,
-                                 period_index=period_index)
+                                 period_index=period_index, selected_trade_type=selected_trade_type)
 
         export_records, import_records = build_top5_tables(filtered)
         

@@ -157,6 +157,22 @@ def create_layout():
                                 ),
                             ], style=STYLE_DROPDOWN_CHILD),
 
+                            html.Div([
+                                html.Label( style=STYLE_DROPDOWN_LABEL),
+                                dcc.Dropdown(
+                                    options=(
+                                        [{'label': 'Trade Type', 'value': 'ALL'}] +
+                                        [{'label': str(c), 'value': c}
+                                         for c in sorted(df['trade_type'].unique())]
+                                    ),
+                                    id='trade-type-dropdown',
+                                    value=['ALL'],
+                                    multi=True,
+                                    style={'border': 'none', 'fontSize': '13px'},
+                                    className='slim-dropdown',
+                                ),
+                            ], style=STYLE_DROPDOWN_CHILD),
+
                         ]
                     ),
 

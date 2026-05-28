@@ -85,6 +85,10 @@ STYLE_CHART_ROW = {
 STYLE_CHART_ITEM = {
     'flex':     '1',
     'minWidth': '0',
+    'backgroundColor': WHITE,
+    'borderRadius':    '10px',
+    'padding':         '16px',
+    'boxShadow':       '0 2px 8px rgba(0,0,0,0.08)'
 }
 
 STYLE_DROPDOWN_LABEL = {
