@@ -5,28 +5,18 @@ from ..styles import (
     STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY, DARK_GREEN, WHITE,
     FONT_MAIN, TABLE_STYLE_TABLE, TABLE_STYLE_HEADER,
     TABLE_STYLE_CELL, TABLE_STYLE_DATA_CONDITIONAL,
-    FIGURE_TITLE, FIGURE_DESCRIPTION
+    FIGURE_TITLE, FIGURE_DESCRIPTION,
+    SECTION_TITLE, SECTION_DESCRIPTION
 )
 
 
 def layout():
     return html.Div([
-
+        # ── Section 1: OVERVIEW ──────────────────────────────────────────────────────
         # ── Section title ──────────────────────────────────────────────────────
         html.Div(children=[
-            html.H2('Overview', style={
-                'margin':        '20px',
-                'fontFamily':    FONT_MAIN,
-                'fontSize':      '28px',
-                'fontWeight':    'bold',
-                'color':         BLUE_ACCENT,
-                'letterSpacing': '0.5px',
-            }),
-            html.P('Total trade flow, balance and year-over-year trend', style={
-                'margin':    '6px 6px 4px 22px',
-                'fontStyle': 'italic',
-                'fontSize':  '16px',
-            }),
+            html.H2('Overview', style=SECTION_TITLE),
+            html.P('Total trade flow, balance and year-over-year trend', style=SECTION_DESCRIPTION),
         ]),
 
         # ── KPI cards ──────────────────────────────────────────────────────────
@@ -67,6 +57,36 @@ def layout():
         ),
 
         
+        # ── Section 2: PRODUCT ──────────────────────────────────────────────────────
+        # ── Section title ──────────────────────────────────────────────────────
+        html.Div(children=[
+            html.H2('Product Performance', style=SECTION_TITLE),
+            html.P('Total trade flow, balance and year-over-year trend', style=SECTION_DESCRIPTION),
+        ]),
+
+        # ── KPI cards ──────────────────────────────────────────────────────────
+        html.Div(
+            style=KPI_STYLE_ROW,
+            children=[
+                html.Div(style=KPI_STYLE_BOX, children=[
+                    html.Div(id='top-HS2'),
+                    html.P('Total Canada Export Value',
+                           style={'color': TEXT_GRAY, 'fontSize': '14px'}),
+                ]),
+                html.Div(style=KPI_STYLE_BOX, children=[
+                    html.Div(id='fastest-growing'),
+                    html.P('Total Canada Import Value',
+                           style={'color': TEXT_GRAY, 'fontSize': '14px'}),
+                ]),
+                # html.Div(style=KPI_STYLE_BOX, children=[
+                #     html.Div(id='number-commodities'),
+                #     html.P('Exports minus imports',
+                #            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
+                # ]),
+            ]
+        ),
+
+
         # ── Row 2 — Top 10 chart + table ───────────────────────────────────────
         html.Div(
             style=STYLE_CHART_ROW,

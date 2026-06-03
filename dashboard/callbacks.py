@@ -1,7 +1,7 @@
 from dash import html, Input, Output
 
 from .data import df, df_kpi, period_index
-from .utils import apply_filters, fmt_value
+from .utils import apply_filters, fmt_value, HS2_LABELS
 from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart
 from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT
 from .pages import overview, products, geography
@@ -54,6 +54,10 @@ def register_callbacks(app):
         Output('total-import',  'children'),
         Output('trade-balance', 'children'),
 
+        Output('top-HS2',  'children'),
+        Output('fastest-growing',  'children'),
+        #Output('number-commodities', 'children'),
+
 
         Input('period-slider', 'value'),
         Input('hs2-dropdown', 'value'),
@@ -70,6 +74,9 @@ def register_callbacks(app):
         total_export  = filtered[filtered['trade_type'] == 'Export']['Value ($)'].sum()
         total_import  = filtered[filtered['trade_type'] == 'Import']['Value ($)'].sum()
         trade_balance = total_export - total_import
+        top_hs2_kpi = filtered.groupby('HS2')['Value ($)'].sum().idxmax()
+        top_hs2_kpi_label = HS2_LABELS[top_hs2_kpi]
+        print(top_hs2_kpi_label)
 
         balance_color = RED if trade_balance < 0 else BLUE_ACCENT
 
@@ -87,7 +94,19 @@ def register_callbacks(app):
                     style={**KPI_STYLE_VALUE, 'color': balance_color}),
         ]
 
-        return kpi_export, kpi_import, kpi_balance
+        kpi_top_HS2 = [
+            html.P('Top HS2 Chapter', style=KPI_STYLE_LABEL),
+            html.H2(top_hs2_kpi_label,
+                    style={**KPI_STYLE_VALUE, 'color': balance_color}),
+        ]
+
+        kpi_fast_grow = [
+        html.P('Fastest Grow Commodity', style=KPI_STYLE_LABEL),
+        html.H2(top_hs2_kpi,
+                style={**KPI_STYLE_VALUE, 'color': balance_color}),
+        ]
+
+        return kpi_export, kpi_import, kpi_balance, kpi_top_HS2, kpi_fast_grow
 
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(

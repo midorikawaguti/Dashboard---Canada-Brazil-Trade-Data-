@@ -185,3 +185,17 @@ FIGURE_DESCRIPTION = {
             'fontSize':   '12px',
             'fontStyle':  'italic',
         }
+
+SECTION_TITLE = {
+                'margin':        '20px',
+                'fontFamily':    FONT_MAIN,
+                'fontSize':      '28px',
+                'fontWeight':    'bold',
+                'color':         BLUE_ACCENT,
+                'letterSpacing': '0.5px',
+            }
+SECTION_DESCRIPTION = {
+                'margin':    '6px 6px 4px 22px',
+                'fontStyle': 'italic',
+                'fontSize':  '16px',
+            }

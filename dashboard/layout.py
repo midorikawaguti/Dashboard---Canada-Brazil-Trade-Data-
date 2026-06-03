@@ -67,23 +67,23 @@ def create_layout():
             ),
 
             # ── Navbar ────────────────────────────────────────────────────────
-            html.Div(
-                style={
-                    'backgroundColor': WHITE,
-                    'padding':         '0 32px',
-                    'display':         'flex',
-                    'gap':             '8px',
-                    'borderBottom':    f'1px solid {MID_GRAY}',
-                    'position':        'sticky',
-                    'top':             '88px',
-                    'zIndex':          '999',
-                },
-                children=[
-                    dcc.Link('Overview',  href='/',          style=NAV_LINK_STYLE),
-                    dcc.Link('Products',  href='/products',  style=NAV_LINK_STYLE),
-                    dcc.Link('Geography', href='/geography', style=NAV_LINK_STYLE),
-                ]
-            ),
+            # html.Div(
+            #     style={
+            #         'backgroundColor': WHITE,
+            #         'padding':         '0 32px',
+            #         'display':         'flex',
+            #         'gap':             '8px',
+            #         'borderBottom':    f'1px solid {MID_GRAY}',
+            #         'position':        'sticky',
+            #         'top':             '88px',
+            #         'zIndex':          '999',
+            #     },
+            #     children=[
+            #         dcc.Link('Overview',  href='/',          style=NAV_LINK_STYLE),
+            #         dcc.Link('Products',  href='/products',  style=NAV_LINK_STYLE),
+            #         dcc.Link('Geography', href='/geography', style=NAV_LINK_STYLE),
+            #     ]
+            # ),
 
             # ── Filters ───────────────────────────────────────────────────────
             html.Div(
@@ -114,7 +114,7 @@ def create_layout():
                                 html.Label(style=STYLE_DROPDOWN_LABEL),
                                 dcc.Dropdown(
                                     options=(
-                                        [{'label': 'All HS2 Codes', 'value': 'ALL'}] +
+                                        [{'label': 'HS2 Codes', 'value': 'ALL'}] +
                                         hs2_options_labeled
                                     ),
                                     id='hs2-dropdown',
@@ -129,7 +129,7 @@ def create_layout():
                                 html.Label( style=STYLE_DROPDOWN_LABEL),
                                 dcc.Dropdown(
                                     options=(
-                                        [{'label': 'All Provinces', 'value': 'ALL'}] +
+                                        [{'label': 'Provinces', 'value': 'ALL'}] +
                                         [{'label': str(p), 'value': p}
                                          for p in sorted(df['Province'].unique())]
                                     ),
@@ -145,7 +145,7 @@ def create_layout():
                                 html.Label( style=STYLE_DROPDOWN_LABEL),
                                 dcc.Dropdown(
                                     options=(
-                                        [{'label': 'All Countries', 'value': 'ALL'}] +
+                                        [{'label': 'Countries', 'value': 'ALL'}] +
                                         [{'label': str(c), 'value': c}
                                          for c in sorted(df['Country'].unique())]
                                     ),
