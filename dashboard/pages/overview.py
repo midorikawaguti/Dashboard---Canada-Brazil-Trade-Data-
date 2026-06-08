@@ -70,12 +70,12 @@ def layout():
             children=[
                 html.Div(style=KPI_STYLE_BOX, children=[
                     html.Div(id='top-HS2'),
-                    html.P('Total Canada Export Value',
+                    html.P(
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 html.Div(style=KPI_STYLE_BOX, children=[
                     html.Div(id='fastest-growing'),
-                    html.P('Total Canada Import Value',
+                    html.P(
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 # html.Div(style=KPI_STYLE_BOX, children=[

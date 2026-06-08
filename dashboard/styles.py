@@ -70,7 +70,7 @@ KPI_STYLE_LABEL = {
 
 KPI_STYLE_VALUE = {
     'margin':   '4px 0 0 0',
-    'fontSize': '24px',
+    'fontSize': '18px',
     'color':    BLUE_ACCENT,
 }
 

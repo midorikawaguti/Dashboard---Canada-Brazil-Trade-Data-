@@ -1,9 +1,9 @@
 from dash import html, Input, Output
 
-from .data import df, df_kpi, period_index
-from .utils import apply_filters, fmt_value, HS2_LABELS
+from .data import df, df_kpi, period_index, df_kpi_commodity
+from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_fastest_growing_commodity
 from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart
-from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT
+from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT, GREEN_TREND, TEXT_GRAY
 from .pages import overview, products, geography
 
 
@@ -54,10 +54,8 @@ def register_callbacks(app):
         Output('total-import',  'children'),
         Output('trade-balance', 'children'),
 
-        Output('top-HS2',  'children'),
         Output('fastest-growing',  'children'),
         #Output('number-commodities', 'children'),
-
 
         Input('period-slider', 'value'),
         Input('hs2-dropdown', 'value'),
@@ -71,13 +69,18 @@ def register_callbacks(app):
                                  period_index=period_index,
                                  selected_trade_type=selected_trade_type)
 
+        filtered_commodity = apply_filters(df_kpi_commodity, period_range, None,  # ← None: commodity already more granular than HS2
+                                selected_province, selected_country,
+                                period_index=period_index,
+                                selected_trade_type=selected_trade_type)
+        
+        #-------------- Overview - KPI --------------
+        
         total_export  = filtered[filtered['trade_type'] == 'Export']['Value ($)'].sum()
         total_import  = filtered[filtered['trade_type'] == 'Import']['Value ($)'].sum()
+        
         trade_balance = total_export - total_import
-        top_hs2_kpi = filtered.groupby('HS2')['Value ($)'].sum().idxmax()
-        top_hs2_kpi_label = HS2_LABELS[top_hs2_kpi]
-        print(top_hs2_kpi_label)
-
+        
         balance_color = RED if trade_balance < 0 else BLUE_ACCENT
 
         kpi_export = [
@@ -94,19 +97,45 @@ def register_callbacks(app):
                     style={**KPI_STYLE_VALUE, 'color': balance_color}),
         ]
 
-        kpi_top_HS2 = [
-            html.P('Top HS2 Chapter', style=KPI_STYLE_LABEL),
-            html.H2(top_hs2_kpi_label,
-                    style={**KPI_STYLE_VALUE, 'color': balance_color}),
+       #-------------- Product Performance - KPI --------------
+
+        hs2_code, pct, note = get_fastest_growing_hs2(filtered, df_kpi)
+
+        print('hs2_code:', hs2_code)
+        print('pct:', pct)
+        print('note:', note)
+        print('filtered years:', filtered['Period'].dt.year.unique())
+        print('filtered months:', filtered['Period'].dt.month.unique())
+
+        clean_name = HS2_LABELS.get(str(hs2_code), str(hs2_code)) if hs2_code else 'N/A'
+
+        if pct is not None:
+            yoy_str   = f'+{pct:.1f}%' if pct >= 0 else f'{pct:.1f}%'
+            yoy_color = GREEN_TREND if pct >= 0 else RED
+            note_str  = '% vs same period prior year'   # ← always shown when pct exists
+        else:
+            yoy_str   = 'N/A'
+            yoy_color = TEXT_GRAY
+            note_str  = note or ''                       # ← shows the explanation
+
+        kpi_fast_hs2 = [
+            html.P('Fastest Growing HS2', style=KPI_STYLE_LABEL),
+            html.P(clean_name, style={
+                'fontSize': '13px', 'color': TEXT_GRAY,
+                'margin': '4px 0 2px 0',
+            }),
+            html.P(yoy_str, style={
+                'fontSize': '24px', 'fontWeight': 'bold',
+                'color': yoy_color, 'margin': '0',
+            }),
+            html.P(note_str, style={
+                'fontSize': '11px', 'color': TEXT_GRAY,
+                'fontStyle': 'italic', 'margin': '4px 0 0 0',
+            }),
         ]
 
-        kpi_fast_grow = [
-        html.P('Fastest Grow Commodity', style=KPI_STYLE_LABEL),
-        html.H2(top_hs2_kpi,
-                style={**KPI_STYLE_VALUE, 'color': balance_color}),
-        ]
 
-        return kpi_export, kpi_import, kpi_balance, kpi_top_HS2, kpi_fast_grow
+        return kpi_export, kpi_import, kpi_balance, kpi_fast_hs2 #,kpi_fast_grow
 
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(

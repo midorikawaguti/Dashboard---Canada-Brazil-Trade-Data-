@@ -19,6 +19,13 @@ df_kpi = df.groupby(
     observed=True
 )['Value ($)'].sum().reset_index()
 
+
+# used only for commodity-level KPIs
+df_kpi_commodity = df.groupby(
+    ['Period', 'Commodity', 'Province', 'Country', 'trade_type'],
+    observed=True
+)['Value ($)'].sum().reset_index()
+
 # ── Dropdown option lists ──────────────────────────────────────────────────────
 year_options      = sorted(df['Year'].unique().tolist())
 

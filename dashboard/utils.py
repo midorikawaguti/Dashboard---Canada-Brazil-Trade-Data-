@@ -1,3 +1,5 @@
+import pandas as pd
+
 # ── HS2 Chapter Labels ─────────────────────────────────────────────────────────
 HS2_LABELS = {
     "01": "Live Animals",
@@ -126,11 +128,13 @@ def apply_filters(df, period_range, selected_hs2, selected_province, selected_co
 
     if period_range and period_index:
         start = period_index[period_range[0]].to_timestamp()
-        end   = period_index[period_range[1]].to_timestamp(how='end')
+        end   = period_index[period_range[1]].to_timestamp() + pd.offsets.MonthEnd(0)
         filtered = filtered[
             (filtered['Period'] >= start) &
             (filtered['Period'] <= end)
         ]
+    print('start-apply-filters:', period_index[period_range[0]])
+    print('end-apply-filters:',   period_index[period_range[1]])
 
     if selected_hs2 and 'ALL' not in selected_hs2:
         filtered = filtered[filtered['HS2'].isin(selected_hs2)]
@@ -145,3 +149,115 @@ def apply_filters(df, period_range, selected_hs2, selected_province, selected_co
         filtered = filtered[filtered['trade_type'].isin(selected_trade_type)]
 
     return filtered
+
+# ── Fasted Growing Commodity ─────────────────────────────────────────────────────
+def get_fastest_growing_commodity(filtered_commodity):
+    """
+    Compares total value per commodity between the last year
+    and the previous year in the filtered data.
+    Returns (name, yoy_pct) of the fastest growing commodity.
+    """
+    # Add year column for grouping
+    df = filtered_commodity.copy()
+    df['year'] = df['Period'].dt.year
+
+    by_year = (
+        df.groupby(['year', 'Commodity'], observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+
+    years = sorted(by_year['year'].unique())
+
+    # Need at least 2 years to compare
+    if len(years) < 2:
+        return None, None
+
+    curr_year = years[-1]
+    prev_year = years[-2]
+
+    curr = by_year[by_year['year'] == curr_year].set_index('Commodity')['Value ($)']
+    prev = by_year[by_year['year'] == prev_year].set_index('Commodity')['Value ($)']
+
+    # Only compare commodities that exist in both years
+    common = curr.index.intersection(prev.index)
+    curr = curr.loc[common]
+    prev = prev.loc[common]
+
+    # Avoid division by zero
+    prev = prev[prev > 0]
+    curr = curr.loc[prev.index]
+
+    if curr.empty:
+        return None, None
+
+    yoy = ((curr - prev) / prev * 100)
+    fastest = yoy.idxmax()
+
+    return fastest, yoy[fastest]
+
+
+def get_fastest_growing_hs2(filtered_hs2, full_hs2):
+    df_curr = filtered_hs2.copy()
+    df_curr['year']  = df_curr['Period'].dt.year
+    df_curr['month'] = df_curr['Period'].dt.month
+
+    if df_curr.empty:
+        return None, None, 'No data for selected period'
+
+    curr = (
+        df_curr
+        .groupby('HS2', observed=True)['Value ($)']
+        .sum()
+    )
+    fastest_curr = curr.idxmax()
+
+    # Get exact year-month pairs in current selection
+    current_periods = df_curr[['year', 'month']].drop_duplicates()
+    current_periods = current_periods.copy()
+    current_periods['prev_year'] = current_periods['year'] - 1
+
+    # Build prior period
+    df_prev = full_hs2.copy()
+    df_prev['year']  = df_prev['Period'].dt.year
+    df_prev['month'] = df_prev['Period'].dt.month
+
+    prev_rows = []
+    for _, row in current_periods.iterrows():
+        match = df_prev[
+            (df_prev['year']  == row['prev_year']) &
+            (df_prev['month'] == row['month'])
+        ]
+        prev_rows.append(match)
+
+    if not prev_rows:
+        return fastest_curr, None, 'No data from same period prior year'
+
+    prev_df = pd.concat(prev_rows)
+
+    # ── Key check: all months must have prior year data ────────────────
+    expected_count = len(current_periods)          # how many year-month pairs we need
+    found_count = prev_df[['year', 'month']].drop_duplicates().shape[0]
+
+    if found_count < expected_count:               # some months are missing
+        return fastest_curr, None, 'No data from same period prior year'
+    # ───────────────────────────────────────────────────────────────────
+
+    if prev_df.empty:
+        return fastest_curr, None, 'No data from same period prior year'
+
+    prev = prev_df.groupby('HS2', observed=True)['Value ($)'].sum()
+
+    common = curr.index.intersection(prev.index)
+    curr   = curr.loc[common]
+    prev   = prev.loc[common]
+    prev   = prev[prev > 0]
+    curr   = curr.loc[prev.index]
+
+    if curr.empty:
+        return fastest_curr, None, 'No data from same period prior year'
+
+    yoy     = ((curr - prev) / prev * 100)
+    fastest = yoy.idxmax()
+
+    return fastest, yoy[fastest], None
