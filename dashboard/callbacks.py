@@ -1,9 +1,9 @@
 from dash import html, Input, Output
 
 from .data import df, df_kpi, period_index, df_kpi_commodity
-from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_fastest_growing_commodity
+from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_top_hs2_share, get_fastest_growing_commodity
 from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart
-from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT, GREEN_TREND, TEXT_GRAY
+from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT, GREEN_TREND, TEXT_GRAY, KPI_TEXT_VALUE, KPI_NOTE
 from .pages import overview, products, geography
 
 
@@ -53,9 +53,9 @@ def register_callbacks(app):
         Output('total-export',  'children'),
         Output('total-import',  'children'),
         Output('trade-balance', 'children'),
-
+        Output('top-HS2', 'children'),
         Output('fastest-growing',  'children'),
-        #Output('number-commodities', 'children'),
+        Output('number-commodities', 'children'),
 
         Input('period-slider', 'value'),
         Input('hs2-dropdown', 'value'),
@@ -83,14 +83,19 @@ def register_callbacks(app):
         
         balance_color = RED if trade_balance < 0 else BLUE_ACCENT
 
+        #-------------- KPI- Total Value Exports
         kpi_export = [
             html.P('Total Exports', style=KPI_STYLE_LABEL),
             html.H2(fmt_value(total_export), style=KPI_STYLE_VALUE),
         ]
+
+        #-------------- KPI- Total Value Imports
         kpi_import = [
             html.P('Total Imports', style=KPI_STYLE_LABEL),
             html.H2(fmt_value(total_import), style=KPI_STYLE_VALUE),
         ]
+
+        #-------------- KPI- Trade Balance
         kpi_balance = [
             html.P('Trade Balance', style=KPI_STYLE_LABEL),
             html.H2(fmt_value(trade_balance),
@@ -98,7 +103,21 @@ def register_callbacks(app):
         ]
 
        #-------------- Product Performance - KPI --------------
+       
+       #-------------- KPI- top HS2
 
+        hs2_code, pct, note = get_top_hs2_share(filtered)
+
+        clean_name = HS2_LABELS.get(str(hs2_code), str(hs2_code))
+
+        kpi_top_hs2 = [
+            html.P('Top HS2 Category', style=KPI_STYLE_LABEL),
+            html.P(clean_name, style=KPI_TEXT_VALUE),
+            html.P(f'{pct:.1f}%', style=KPI_STYLE_VALUE),
+            html.P(note, style=KPI_NOTE),
+        ]
+
+        #-------------- KPI- fast HS2
         hs2_code, pct, note = get_fastest_growing_hs2(filtered, df_kpi)
 
         print('hs2_code:', hs2_code)
@@ -120,22 +139,24 @@ def register_callbacks(app):
 
         kpi_fast_hs2 = [
             html.P('Fastest Growing HS2', style=KPI_STYLE_LABEL),
-            html.P(clean_name, style={
-                'fontSize': '13px', 'color': TEXT_GRAY,
-                'margin': '4px 0 2px 0',
+            html.P(clean_name, style=KPI_TEXT_VALUE),
+            html.P(yoy_str, style={**KPI_STYLE_VALUE,
+                'color': yoy_color
             }),
-            html.P(yoy_str, style={
-                'fontSize': '24px', 'fontWeight': 'bold',
-                'color': yoy_color, 'margin': '0',
-            }),
-            html.P(note_str, style={
-                'fontSize': '11px', 'color': TEXT_GRAY,
-                'fontStyle': 'italic', 'margin': '4px 0 0 0',
-            }),
+            html.P(note_str, style=KPI_NOTE),
         ]
 
+        #-------------- KPI- total active trade items
 
-        return kpi_export, kpi_import, kpi_balance, kpi_fast_hs2 #,kpi_fast_grow
+        number_commodities = len(set(filtered_commodity['Commodity']))
+        kpi_number_commodities = [
+            html.P('Number of Commodities', style=KPI_STYLE_LABEL),
+            html.H2(number_commodities,
+                    style=KPI_STYLE_VALUE),
+            html.P('Total Unique Commodities Traded', style=KPI_NOTE),
+        ]
+
+        return kpi_export, kpi_import, kpi_balance, kpi_top_hs2, kpi_fast_hs2, kpi_number_commodities 
 
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(

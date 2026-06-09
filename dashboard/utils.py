@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 # ── HS2 Chapter Labels ─────────────────────────────────────────────────────────
 HS2_LABELS = {
     "01": "Live Animals",
@@ -150,6 +151,36 @@ def apply_filters(df, period_range, selected_hs2, selected_province, selected_co
 
     return filtered
 
+
+
+# ── TOP HS2 category ─────────────────────────────────────────────────────
+def get_top_hs2_share(filtered_df):
+    from .utils import HS2_LABELS
+
+    total_trade = filtered_df['Value ($)'].sum()
+
+    if total_trade == 0:
+        return None, None, 'No data available'
+
+    hs2 = (
+        filtered_df
+        .groupby('HS2', observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+
+    hs2['share_pct'] = (
+        hs2['Value ($)'] / total_trade * 100
+    )
+
+    top = hs2.loc[hs2['share_pct'].idxmax()]
+
+    return (
+        top['HS2'],
+        round(top['share_pct'], 1),
+        'Contribution to total trade'
+    )
+
 # ── Fasted Growing Commodity ─────────────────────────────────────────────────────
 def get_fastest_growing_commodity(filtered_commodity):
     """
@@ -196,6 +227,7 @@ def get_fastest_growing_commodity(filtered_commodity):
 
     return fastest, yoy[fastest]
 
+# ── Fasted Growing HS2 ─────────────────────────────────────────────────────
 
 def get_fastest_growing_hs2(filtered_hs2, full_hs2):
     df_curr = filtered_hs2.copy()

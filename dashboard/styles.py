@@ -70,8 +70,22 @@ KPI_STYLE_LABEL = {
 
 KPI_STYLE_VALUE = {
     'margin':   '4px 0 0 0',
-    'fontSize': '18px',
+    'fontSize': '24px',
     'color':    BLUE_ACCENT,
+    'fontWeight': 'bold'
+}
+
+KPI_TEXT_VALUE = {
+    'fontSize': '13px', 
+    'color': TEXT_GRAY,
+    'margin': '4px 0 2px 0',
+}
+
+KPI_NOTE= {
+    'fontSize': '12px', 
+    'color': TEXT_GRAY,
+    'fontStyle': 'italic', 
+    'margin': '4px 0 0 0'
 }
 
 STYLE_CHART_ROW = {
