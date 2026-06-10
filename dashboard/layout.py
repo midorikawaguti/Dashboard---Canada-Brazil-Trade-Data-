@@ -7,6 +7,10 @@ from .styles import (
     STYLE_DROPDOWN_ROW, STYLE_DROPDOWN_CHILD, STYLE_DROPDOWN_LABEL,
     NAV_LINK_STYLE,
 )
+from .pages.overview import layout as overview_layout
+from .pages.products import layout as product_layout
+from .pages.geography import layout as geography_layout
+
 
 
 def create_layout():
@@ -65,6 +69,7 @@ def create_layout():
                     ),
                 ]
             ),
+
 
             # ── Navbar ────────────────────────────────────────────────────────
             # html.Div(
@@ -203,7 +208,14 @@ def create_layout():
             ),
 
             # ── Page content (swapped by routing callback) ────────────────────
-            html.Div(id='page-content'),
+            #html.Div(id='page-content'),
+            overview_layout(),
+
+            product_layout(),
+
+            geography_layout(),
 
         ]
+
+
     )

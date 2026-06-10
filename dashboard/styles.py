@@ -47,7 +47,7 @@ HEADER_TITLE ={
 KPI_STYLE_ROW = {
     'display':  'flex',
     'gap':      '8px',
-    'margin':   '8px 16px',
+    'margin':   '8px 8px',
     'width':    'auto',
     'flexWrap': 'wrap',
 }
@@ -159,11 +159,11 @@ TABLE_STYLE_HEADER = {
 }
 
 TABLE_STYLE_CELL = {
-    'textAlign':       'center',
-    'fontSize':        '13px',
-    'padding':         '10px',
-    'fontFamily':      FONT_BODY,
-    'border':          'none',
+    'textAlign':'center',
+    'fontSize':'13px',
+    'padding': '4px',
+    'fontFamily': FONT_BODY,
+    'border': 'none',
     'backgroundColor': WHITE,
 }
 

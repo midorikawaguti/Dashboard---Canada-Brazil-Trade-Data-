@@ -2,7 +2,7 @@ from dash import html, Input, Output
 
 from .data import df, df_kpi, period_index, df_kpi_commodity
 from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_top_hs2_share, get_fastest_growing_commodity
-from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart
+from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart, build_top_commodity_table
 from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT, GREEN_TREND, TEXT_GRAY, KPI_TEXT_VALUE, KPI_NOTE
 from .pages import overview, products, geography
 
@@ -158,6 +158,10 @@ def register_callbacks(app):
 
         return kpi_export, kpi_import, kpi_balance, kpi_top_hs2, kpi_fast_hs2, kpi_number_commodities 
 
+
+
+
+
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(
         Output('monthly-trade',  'figure'),
@@ -166,6 +170,7 @@ def register_callbacks(app):
         Output('top5-export-table',   'data'),     
         Output('top5-import-table',   'data'),     
         Output('hs2-share-chart',     'figure'),
+        Output('top-commodity-table', 'data'),
 
         Input('period-slider',      'value'),
         Input('hs2-dropdown', 'value'),
@@ -178,27 +183,18 @@ def register_callbacks(app):
         # Charts need the full df (Period column for month grouping)
         filtered = apply_filters(df, period_range, selected_hs2,
                                  selected_province, selected_country,
-                                 period_index=period_index, selected_trade_type=selected_trade_type)
+                                 period_index=period_index, 
+                                 selected_trade_type=selected_trade_type)
 
-        export_records, import_records = build_top5_tables(filtered)
+        
+        export_records, import_records = build_top5_tables(filtered, df_kpi_commodity)
         
         return (build_monthly_chart(filtered), 
                 #build_top_countries(filtered), 
                 build_top_countries_table(filtered),
                 export_records,                        
                 import_records,                        
-                build_hs2_share_chart(filtered) )      
+                build_hs2_share_chart(filtered),
+                build_top_commodity_table(filtered) )      
 
-    # ── Products callbacks (add here as you build the Products page) ──────────
-    # @app.callback(
-    #     Output('top-products', 'figure'),
-    #     Input('year-dropdown', 'value'), ...
-    # )
-    # def update_products(...): ...
 
-    # ── Geography callbacks (add here as you build the Geography page) ────────
-    # @app.callback(
-    #     Output('province-map', 'figure'),
-    #     Input('year-dropdown', 'value'), ...
-    # )
-    # def update_geography(...): ...
