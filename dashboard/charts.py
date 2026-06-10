@@ -195,6 +195,45 @@ def build_monthly_chart(filtered_df):
 #         height=400,
 #     )
 #     return fig
+# ── Table 1  — Top Commodity Share ──────────────────────────────────
+def build_top_commodity_table(filtered_df):
+    grouped = (
+        filtered_df
+        .groupby(['Commodity', 'trade_type'], observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+
+    pivot = grouped.pivot_table(
+        index='Commodity', columns='trade_type',
+        values='Value ($)', aggfunc='sum'
+    ).fillna(0).reset_index()
+    pivot.columns.name = None
+
+    # Handle case where Export or Import column might be missing after filtering
+    if 'Export' not in pivot.columns:
+        pivot['Export'] = 0
+    if 'Import' not in pivot.columns:
+        pivot['Import'] = 0
+
+    pivot['Total'] = pivot['Export'] + pivot['Import']
+    pivot = pivot.nlargest(10, 'Total').reset_index(drop=True)
+
+    total_all = pivot['Total'].sum()
+    pivot['Share %'] = (pivot['Total'] / total_all * 100).round(1)
+    pivot['Rank'] = pivot.index + 1
+
+    # Format for display
+    table_df = pd.DataFrame({
+        '#':          pivot['Rank'],
+        'Commodity':    pivot['Commodity'],
+        'Exports':    pivot['Export'].apply(fmt_value),
+        'Imports':    pivot['Import'].apply(fmt_value),
+        'Total Trade': pivot['Total'].apply(fmt_value),
+        'Share %':    pivot['Share %'].astype(str) + '%',
+    })
+
+    return table_df.to_dict('records')
 
 # ── Table 1  — Top Countries Share ──────────────────────────────────
 def build_top_countries_table(filtered_df):
@@ -237,35 +276,68 @@ def build_top_countries_table(filtered_df):
     return table_df.to_dict('records')
 
 # ── Chart  ─────────────────────────────────
-def build_top5_tables(filtered_df):
-    """Returns (export_records, import_records) for the two mini tables."""
-    
-    # Get all periods for YoY calculation
-    all_periods = sorted(filtered_df['Period'].dt.to_period('M').unique())
-    
+def build_top5_tables(filtered_df, full_df):
+    """
+    Returns (export_records, import_records) for the two mini tables.
+    YoY compares selected period vs same period 1 year prior.
+    full_df is used to look up prior year data outside the filtered range.
+    """
+
+    # Get exact year-month pairs in current selection
+    current_periods = (
+        filtered_df[['Period']]
+        .drop_duplicates()
+        .copy()
+    )
+    current_periods['year']      = current_periods['Period'].dt.year
+    current_periods['month']     = current_periods['Period'].dt.month
+    current_periods['prev_year'] = current_periods['year'] - 1
+
+    # Check if all months have prior year data in full_df
+    full_df = full_df.copy()
+    full_df['year']  = full_df['Period'].dt.year
+    full_df['month'] = full_df['Period'].dt.month
+
+    prev_rows = []
+    for _, row in current_periods.iterrows():
+        match = full_df[
+            (full_df['year']  == row['prev_year']) &
+            (full_df['month'] == row['month'])
+        ]
+        prev_rows.append(match)
+
+    expected_count = len(current_periods)
+    prior_df       = pd.concat(prev_rows) if prev_rows else pd.DataFrame()
+    found_count    = prior_df[['year', 'month']].drop_duplicates().shape[0] if not prior_df.empty else 0
+    has_prior_year = found_count == expected_count   # all months matched
+
+# ── Chart  ─────────────────────────────────
     def get_top5(trade_type):
         sub = filtered_df[filtered_df['trade_type'] == trade_type]
-        
-        # Total value per commodity
+
         total = (
             sub.groupby('Commodity', observed=True)['Value ($)']
             .sum()
             .nlargest(5)
             .reset_index()
         )
-        
-        # YoY — compare last year vs previous year
-        by_year = (
-            sub.groupby([sub['Period'].dt.year.rename('year'), 'Commodity'],
-                        observed=True)['Value ($)']
-            .sum().reset_index()
-        )
-        years = sorted(by_year['year'].unique())
-        
+
         yoy_map = {}
-        if len(years) >= 2:
-            curr = by_year[by_year['year'] == years[-1]].set_index('Commodity')['Value ($)']
-            prev = by_year[by_year['year'] == years[-2]].set_index('Commodity')['Value ($)']
+
+        if has_prior_year:
+            # Current period totals per commodity
+            curr = (
+                sub.groupby('Commodity', observed=True)['Value ($)']
+                .sum()
+            )
+
+            # Prior period totals per commodity
+            prior_sub = prior_df[prior_df['trade_type'] == trade_type]
+            prev = (
+                prior_sub.groupby('Commodity', observed=True)['Value ($)']
+                .sum()
+            )
+
             for c in total['Commodity']:
                 if c in curr.index and c in prev.index and prev[c] != 0:
                     yoy_map[c] = ((curr[c] - prev[c]) / prev[c] * 100)
@@ -274,15 +346,22 @@ def build_top5_tables(filtered_df):
 
         records = []
         for _, row in total.iterrows():
-            yoy = yoy_map.get(row['Commodity'])
-            yoy_str = f"+{yoy:.0f}%" if yoy and yoy >= 0 else (f"{yoy:.0f}%" if yoy else 'N/A')
-            # Shorten commodity name
-            name = str(row['Commodity'])[:20] + '...' if len(str(row['Commodity'])) > 20 else str(row['Commodity'])
+            yoy     = yoy_map.get(row['Commodity'])
+            if yoy is None and not has_prior_year:
+                yoy_str = 'N/A'       # no prior year data at all
+            elif yoy is None:
+                yoy_str = 'N/A'       # commodity not found in prior year
+            elif yoy >= 0:
+                yoy_str = f'+{yoy:.0f}%'
+            else:
+                yoy_str = f'{yoy:.0f}%'
+
+            name = str(row['Commodity'])[:60] + '...' if len(str(row['Commodity'])) > 20 else str(row['Commodity'])
             records.append({
                 'Commodity': name,
                 'Value':     fmt_value(row['Value ($)']),
                 'YoY':       yoy_str,
-                '_yoy_val':  yoy,   # raw value for conditional colouring
+                '_yoy_val':  yoy,
             })
         return records
 
