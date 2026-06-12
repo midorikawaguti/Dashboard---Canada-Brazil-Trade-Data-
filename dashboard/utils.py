@@ -152,7 +152,7 @@ def apply_filters(df, period_range, selected_hs2, selected_province, selected_co
     return filtered
 
 
-
+#Product KPI
 # ── TOP HS2 category ─────────────────────────────────────────────────────
 def get_top_hs2_share(filtered_df):
     from .utils import HS2_LABELS
@@ -293,3 +293,58 @@ def get_fastest_growing_hs2(filtered_hs2, full_hs2):
     fastest = yoy.idxmax()
 
     return fastest, yoy[fastest], None
+
+#Geography KPI
+# ── TOP Province  ─────────────────────────────────────────────────────
+def get_top_province(filtered_df):
+
+    total_trade = filtered_df['Value ($)'].sum()
+
+    if total_trade == 0:
+        return None, None, 'No data available'
+
+    province = (
+        filtered_df
+        .groupby('Province', observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+    
+    province['share_pct'] = (
+        province['Value ($)'] / total_trade * 100
+    )
+
+    top = province.loc[province['share_pct'].idxmax()]
+    print(top)
+    return (
+        top['Province'],
+        round(top['share_pct'], 1),
+        'Contribution to total trade'
+    )
+
+# ── TOP Country  ─────────────────────────────────────────────────────
+def get_top_country(filtered_df):
+
+    total_trade = filtered_df['Value ($)'].sum()
+
+    if total_trade == 0:
+        return None, None, 'No data available'
+
+    country = (
+        filtered_df
+        .groupby('Country', observed=True)['Value ($)']
+        .sum()
+        .reset_index()
+    )
+    
+    country['share_pct'] = (
+        country['Value ($)'] / total_trade * 100
+    )
+
+    top = country.loc[country['share_pct'].idxmax()]
+    print(top)
+    return (
+        top['Country'],
+        round(top['share_pct'], 1),
+        'Contribution to total trade'
+    )

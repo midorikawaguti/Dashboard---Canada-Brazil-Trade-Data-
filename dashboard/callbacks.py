@@ -1,7 +1,7 @@
 from dash import html, Input, Output
 
 from .data import df, df_kpi, period_index, df_kpi_commodity
-from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_top_hs2_share, get_fastest_growing_commodity
+from .utils import apply_filters, fmt_value, HS2_LABELS, get_fastest_growing_hs2, get_top_hs2_share, get_fastest_growing_commodity, get_top_province, get_top_country
 from .charts import build_monthly_chart, build_top_countries_table, build_top5_tables, build_hs2_share_chart, build_top_commodity_table
 from .styles import KPI_STYLE_LABEL, KPI_STYLE_VALUE, RED, BLUE_ACCENT, GREEN_TREND, TEXT_GRAY, KPI_TEXT_VALUE, KPI_NOTE
 from .pages import overview, products, geography
@@ -56,6 +56,9 @@ def register_callbacks(app):
         Output('top-HS2', 'children'),
         Output('fastest-growing',  'children'),
         Output('number-commodities', 'children'),
+        Output('top-province', 'children'),
+        Output('top-country', 'children'),
+        Output('number-countries', 'children'),
 
         Input('period-slider', 'value'),
         Input('hs2-dropdown', 'value'),
@@ -74,7 +77,7 @@ def register_callbacks(app):
                                 period_index=period_index,
                                 selected_trade_type=selected_trade_type)
         
-        #-------------- Overview - KPI --------------
+ 
         
         total_export  = filtered[filtered['trade_type'] == 'Export']['Value ($)'].sum()
         total_import  = filtered[filtered['trade_type'] == 'Import']['Value ($)'].sum()
@@ -101,6 +104,7 @@ def register_callbacks(app):
             html.H2(fmt_value(trade_balance),
                     style={**KPI_STYLE_VALUE, 'color': balance_color}),
         ]
+
 
        #-------------- Product Performance - KPI --------------
        
@@ -156,11 +160,45 @@ def register_callbacks(app):
             html.P('Total Unique Commodities Traded', style=KPI_NOTE),
         ]
 
-        return kpi_export, kpi_import, kpi_balance, kpi_top_hs2, kpi_fast_hs2, kpi_number_commodities 
+        #-------------- GEOGRAPHY - KPI --------------
+        #-------------- KPI- top province
+
+        province_name, pct, note = get_top_province(filtered)
 
 
+        kpi_top_province = [
+            html.P('Top Province', style=KPI_STYLE_LABEL),
+            html.P(province_name, style=KPI_TEXT_VALUE),
+            html.P(f'{pct:.1f}%', style=KPI_STYLE_VALUE),
+            html.P(note, style=KPI_NOTE),
+        ]
+
+         #-------------- KPI- top country
+
+        country_name, pct, note = get_top_country(filtered)
 
 
+        kpi_top_country = [
+            html.P('Top Country', style=KPI_STYLE_LABEL),
+            html.P(country_name, style=KPI_TEXT_VALUE),
+            html.P(f'{pct:.1f}%', style=KPI_STYLE_VALUE),
+            html.P(note, style=KPI_NOTE),
+        ]
+
+
+        #-------------- KPI- total countries
+
+        number_countries = len(set(filtered_commodity['Country']))
+        kpi_number_country = [
+            html.P('Number of Countries', style=KPI_STYLE_LABEL),
+            html.H2(number_countries,
+                    style=KPI_STYLE_VALUE),
+            html.P('Total Unique Countries', style=KPI_NOTE),
+        ]
+        return kpi_export, kpi_import, kpi_balance, kpi_top_hs2, kpi_fast_hs2, kpi_number_commodities, kpi_top_province, kpi_top_country, kpi_number_country
+
+
+        
 
     # ── Overview: Charts ──────────────────────────────────────────────────────
     @app.callback(

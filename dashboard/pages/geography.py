@@ -30,12 +30,12 @@ def layout():
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 html.Div(style=KPI_STYLE_BOX, children=[
-                    html.Div(id='top-partner'),
+                    html.Div(id='top-country'),
                     html.P(
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 html.Div(style=KPI_STYLE_BOX, children=[
-                    html.Div(id='number-commodities'),
+                    html.Div(id='number-countries'),
                     html.P(
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
