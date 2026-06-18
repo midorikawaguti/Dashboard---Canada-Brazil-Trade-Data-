@@ -2,7 +2,7 @@ from dash import html, dcc, dash_table
 
 from ..styles import (
     KPI_STYLE_ROW, KPI_STYLE_BOX, STYLE_CHART_ROW,
-    STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY, DARK_GREEN, WHITE,
+    STYLE_CHART_ITEM, BLUE_ACCENT, TEXT_GRAY, WHITE,
     FONT_MAIN, TABLE_STYLE_TABLE, TABLE_STYLE_HEADER,
     TABLE_STYLE_CELL, TABLE_STYLE_DATA_CONDITIONAL,
     FIGURE_TITLE, FIGURE_DESCRIPTION,
@@ -13,48 +13,62 @@ from ..styles import (
 def layout():
     return html.Div([
 
-        # ── Section : GEOGRAPHY ──────────────────────────────────────────────────────
         # ── Section title ──────────────────────────────────────────────────────
         html.Div(children=[
             html.H2('Geographic Insights', style=SECTION_TITLE),
-            html.P('Total trade flow, balance and year-over-year trend', style=SECTION_DESCRIPTION),
+            html.P('Trade flows by province and country', style=SECTION_DESCRIPTION),
         ]),
 
-        # ── KPI cards ──────────────────────────────────────────────────────────
+        # ── KPI Row — Geography KPIs ───────────────────────────────────────────
         html.Div(
             style=KPI_STYLE_ROW,
             children=[
                 html.Div(style=KPI_STYLE_BOX, children=[
                     html.Div(id='top-province'),
-                    html.P(
+                    html.P('Top province by trade value',
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 html.Div(style=KPI_STYLE_BOX, children=[
                     html.Div(id='top-country'),
-                    html.P(
+                    html.P('Top country by trade value',
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
                 html.Div(style=KPI_STYLE_BOX, children=[
                     html.Div(id='number-countries'),
-                    html.P(
+                    html.P('Total unique countries traded with',
                            style={'color': TEXT_GRAY, 'fontSize': '14px'}),
                 ]),
             ]
         ),
 
+        # ── Row 1 — Province small multiples ──────────────────────────────────
+        html.Div(
+            style=STYLE_CHART_ROW,
+            children=[
+                html.Div(
+                    style=STYLE_CHART_ITEM,
+                    children=[
+                        html.H4('Export vs Import by Province', style=FIGURE_TITLE),
+                        html.P('Top 4 provinces by total trade value',
+                               style=FIGURE_DESCRIPTION),
+                        dcc.Graph(id='province-small-multiples',
+                                  config={'displayModeBar': False}),
+                    ]
+                ),
+            ]
+        ),
 
-        # ── Row 2 — Top 10 chart + table ───────────────────────────────────────
+        # ── Row 2 — HS2 share + Top countries table ────────────────────────────
         html.Div(
             style=STYLE_CHART_ROW,
             children=[
 
                 html.Div(
-                    style=
-                        STYLE_CHART_ITEM,
+                    style=STYLE_CHART_ITEM,
                     children=[
                         html.H4('Trade Share by HS2 Category', style=FIGURE_TITLE),
                         html.P('% of total trade value', style=FIGURE_DESCRIPTION),
-                        dcc.Graph(id='hs2-share-chart',
+                        dcc.Graph(id='hs2-share-chart-geo',
                                   config={'displayModeBar': False}),
                     ]
                 ),
@@ -63,9 +77,10 @@ def layout():
                     style={**STYLE_CHART_ITEM, 'flex': '0.8'},
                     children=[
                         html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
-                        html.P('Share of total Canada trade by country', style=FIGURE_DESCRIPTION),
+                        html.P('Share of total Canada trade by country',
+                               style=FIGURE_DESCRIPTION),
                         dash_table.DataTable(
-                            id='top-countries-table',
+                            id='top-countries-table-geo',
                             columns=[
                                 {'name': '#',           'id': '#'},
                                 {'name': 'Country',     'id': 'Country'},
@@ -83,99 +98,6 @@ def layout():
                         ),
                     ]
                 ),
-
-            ]
-        ),
-
-        # ── Row 3 — Top 5 tables + HS2 share chart ────────────────────────────
-        html.Div(
-            style={**STYLE_CHART_ROW, 'alignItems': 'flex-start'},
-            children=[
-
-                # Top 5 Exports table
-                html.Div(
-                    style={**STYLE_CHART_ITEM, 'flex': '1'},
-                    children=[
-                        html.H4('Top 5 Exports', style=FIGURE_TITLE),
-                        html.P('Highest export commodities', style=FIGURE_DESCRIPTION),
-
-                        dash_table.DataTable(
-                            id='top5-export-table',
-                            columns=[
-                                {'name': 'Commodity', 'id': 'Commodity'},
-                                {'name': 'Value',     'id': 'Value'},
-                                {'name': 'YoY',       'id': 'YoY'},
-                            ],
-                            data=[],
-                            style_table=TABLE_STYLE_TABLE,
-                            style_header=TABLE_STYLE_HEADER,
-                            style_cell=TABLE_STYLE_CELL,
-                            style_data_conditional=[
-                                *TABLE_STYLE_DATA_CONDITIONAL,
-
-                                {
-                                    'if': {
-                                        'filter_query': '{_yoy_val} > 0',
-                                        'column_id': 'YoY'
-                                    },
-                                    'color': '#2d6a4f',
-                                    'fontWeight': 'bold'
-                                },
-                                {
-                                    'if': {
-                                        'filter_query': '{_yoy_val} < 0',
-                                        'column_id': 'YoY'
-                                    },
-                                    'color': '#C00000',
-                                    'fontWeight': 'bold'
-                                },
-                            ],
-                            page_size=5,
-                        ),
-                    ]
-                ),
-
-                html.Div(
-                    style={**STYLE_CHART_ITEM, 'flex': '1'},
-                    children=[
-                        html.H4('Top 5 Imports', style=FIGURE_TITLE),
-                        html.P('Highest import commodities', style=FIGURE_DESCRIPTION),
-
-                        dash_table.DataTable(
-                            id='top5-import-table',
-                            columns=[
-                                {'name': 'Commodity', 'id': 'Commodity'},
-                                {'name': 'Value',     'id': 'Value'},
-                                {'name': 'YoY',       'id': 'YoY'},
-                            ],
-                            data=[],
-                            style_table=TABLE_STYLE_TABLE,
-                            style_header=TABLE_STYLE_HEADER,
-                            style_cell=TABLE_STYLE_CELL,
-                            style_data_conditional=[
-                                *TABLE_STYLE_DATA_CONDITIONAL,
-
-                                {
-                                    'if': {
-                                        'filter_query': '{_yoy_val} > 0',
-                                        'column_id': 'YoY'
-                                    },
-                                    'color': '#2d6a4f',
-                                    'fontWeight': 'bold'
-                                },
-                                {
-                                    'if': {
-                                        'filter_query': '{_yoy_val} < 0',
-                                        'column_id': 'YoY'
-                                    },
-                                    'color': '#C00000',
-                                    'fontWeight': 'bold'
-                                },
-                            ],
-                            page_size=5,
-                        ),
-                    ]
-                )
 
             ]
         ),

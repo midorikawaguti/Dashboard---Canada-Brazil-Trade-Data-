@@ -7,9 +7,10 @@ from .styles import (
     STYLE_DROPDOWN_ROW, STYLE_DROPDOWN_CHILD, STYLE_DROPDOWN_LABEL,
     NAV_LINK_STYLE,
 )
-from .pages.overview import layout as overview_layout
-from .pages.products import layout as product_layout
-from .pages.geography import layout as geography_layout
+
+# from .pages.overview import layout as overview_layout
+# from .pages.products import layout as product_layout
+# from .pages.geography import layout as geography_layout
 
 
 
@@ -72,23 +73,23 @@ def create_layout():
 
 
             # ── Navbar ────────────────────────────────────────────────────────
-            # html.Div(
-            #     style={
-            #         'backgroundColor': WHITE,
-            #         'padding':         '0 32px',
-            #         'display':         'flex',
-            #         'gap':             '8px',
-            #         'borderBottom':    f'1px solid {MID_GRAY}',
-            #         'position':        'sticky',
-            #         'top':             '88px',
-            #         'zIndex':          '999',
-            #     },
-            #     children=[
-            #         dcc.Link('Overview',  href='/',          style=NAV_LINK_STYLE),
-            #         dcc.Link('Products',  href='/products',  style=NAV_LINK_STYLE),
-            #         dcc.Link('Geography', href='/geography', style=NAV_LINK_STYLE),
-            #     ]
-            # ),
+            html.Div(
+                style={
+                    'backgroundColor': WHITE,
+                    'padding':         '0 32px',
+                    'display':         'flex',
+                    'gap':             '8px',
+                    'borderBottom':    f'1px solid {MID_GRAY}',
+                    'position':        'sticky',
+                    'top':             '88px',
+                    'zIndex':          '999',
+                },
+                children=[
+                    dcc.Link('Overview',  href='/',          style=NAV_LINK_STYLE),
+                    dcc.Link('Products',  href='/products',  style=NAV_LINK_STYLE),
+                    dcc.Link('Geography', href='/geography', style=NAV_LINK_STYLE),
+                ]
+            ),
 
             # ── Filters ───────────────────────────────────────────────────────
             html.Div(
@@ -208,12 +209,12 @@ def create_layout():
             ),
 
             # ── Page content (swapped by routing callback) ────────────────────
-            #html.Div(id='page-content'),
-            overview_layout(),
+            html.Div(id='page-content'),
+            # overview_layout(),
 
-            product_layout(),
+            # product_layout(),
 
-            geography_layout(),
+            # geography_layout(),
 
         ]
 
