@@ -9,29 +9,34 @@ for col in ['Commodity', 'Province', 'Country', 'trade_type']:
 
 df['Year']  = df['Period'].dt.year
 df['Month'] = df['Period'].dt.month
-df['HS2'] = df['Commodity'].astype(str).str[:2]
-df['HS2'] = df['HS2'].astype('category')
+df['HS2']   = df['Commodity'].astype(str).str[:2]
+df['HS2']   = df['HS2'].astype('category')
 
-
-# ── Pre-aggregated summary for KPIs (faster filtering) ────────────────────────
+# ── Pre-aggregated summaries ───────────────────────────────────────────────────
 df_kpi = df.groupby(
     ['Period', 'HS2', 'Province', 'Country', 'trade_type'],
     observed=True
 )['Value ($)'].sum().reset_index()
 
-
-# used only for commodity-level KPIs
 df_kpi_commodity = df.groupby(
     ['Period', 'Commodity', 'Province', 'Country', 'trade_type'],
     observed=True
 )['Value ($)'].sum().reset_index()
 
-# ── Dropdown option lists ──────────────────────────────────────────────────────
-year_options      = sorted(df['Year'].unique().tolist())
+# ── HS2 Section mapping (from CSV) ────────────────────────────────────────────
+hs2_sections     = pd.read_csv("Dataset/HS2_Sections_With_Descriptions.csv")
+hs2_sections['HS2_Code'] = hs2_sections['HS2_Code'].astype(str).str.zfill(2)
+hs2_to_section   = dict(zip(hs2_sections['HS2_Code'], hs2_sections['Section']))
+hs2_to_description = dict(zip(hs2_sections['HS2_Code'], hs2_sections['HS2_Description']))
 
-province_options  = sorted(df['Province'].cat.categories.tolist())
-country_options   = sorted(df['Country'].cat.categories.tolist())
-date_range_label  = f"{df['Period'].min().strftime('%b %Y')} – {df['Period'].max().strftime('%b %Y')}"
+# ── Dropdown option lists ──────────────────────────────────────────────────────
+year_options     = sorted(df['Year'].unique().tolist())
+province_options = sorted(df['Province'].cat.categories.tolist())
+country_options  = sorted(df['Country'].cat.categories.tolist())
+date_range_label = (
+    f"{df['Period'].min().strftime('%b %Y')} – "
+    f"{df['Period'].max().strftime('%b %Y')}"
+)
 
 hs2_options = sorted(df['HS2'].cat.categories.tolist())
 hs2_options_labeled = [
@@ -39,7 +44,7 @@ hs2_options_labeled = [
     for code in hs2_options
 ]
 
-# ── Period slider ──────────────────────────────────────────────────────
-periods = sorted(df['Period'].dt.to_period('M').unique())
-period_labels = [p.strftime('%b %Y') for p in periods]  # ['Jan 2024', 'Feb 2024', ...]
-period_index  = {i: p for i, p in enumerate(periods)}   # {0: Period('2024-01'), ...}
+# ── Period slider ──────────────────────────────────────────────────────────────
+periods       = sorted(df['Period'].dt.to_period('M').unique())
+period_labels = [p.strftime('%b %Y') for p in periods]
+period_index  = {i: p for i, p in enumerate(periods)}
