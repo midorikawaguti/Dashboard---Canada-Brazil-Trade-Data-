@@ -344,3 +344,13 @@ def get_hs2_codes_for_section(section_name, hs2_to_section):
         code for code, section in hs2_to_section.items()
         if section == section_name
     ]
+
+
+def get_hs2_codes_for_section(section_name, hs2_to_section):
+    """Returns list of HS2 codes belonging to a given section name."""
+    if not section_name:
+        return None
+    return [
+        code for code, section in hs2_to_section.items()
+        if section == section_name
+    ]

@@ -256,33 +256,78 @@ def build_top5_tables(filtered_df, full_df):
 # HS2 SHARE HORIZONTAL BAR
 # ══════════════════════════════════════════════════════════════════════════════
 def build_hs2_share_chart(filtered_df):
-    total_all = filtered_df['Value ($)'].sum()
-    if total_all == 0:
+    """
+    Horizontal grouped bar showing Export and Import value for each HS2 code,
+    with % share labels. Used on the Products page to show HS2 breakdown
+    within a selected section.
+    """
+    if filtered_df.empty:
         return go.Figure()
 
-    hs2 = (
+    grouped = (
         filtered_df
-        .groupby('HS2', observed=True)['Value ($)']
+        .groupby(['HS2', 'trade_type'], observed=True)['Value ($)']
         .sum().reset_index()
     )
-    hs2['share'] = (hs2['Value ($)'] / total_all * 100).round(1)
-    hs2['label'] = hs2['HS2'].apply(lambda x: HS2_LABELS.get(str(x), str(x)))
-    hs2 = hs2.nlargest(10, 'share').sort_values('share')
+    if grouped.empty:
+        return go.Figure()
 
-    fig = go.Figure(go.Bar(
-        x=hs2['share'],
-        y=hs2['label'],
-        orientation='h',
-        text=hs2['share'].apply(lambda x: f'{x}%'),
+    # Top 10 HS2 by total
+    top10 = (
+        grouped.groupby('HS2', observed=True)['Value ($)']
+        .sum().nlargest(10).index.tolist()
+    )
+    grouped = grouped[grouped['HS2'].isin(top10)].copy()
+    total_all = grouped['Value ($)'].sum()
+    grouped['label'] = grouped['HS2'].apply(
+        lambda x: HS2_LABELS.get(str(x), str(x))
+    )
+
+    order = (
+        grouped.groupby('label')['Value ($)'].sum()
+        .sort_values(ascending=True).index.tolist()
+    )
+
+    exports = grouped[grouped['trade_type'] == 'Export'].set_index('label')
+    imports = grouped[grouped['trade_type'] == 'Import'].set_index('label')
+
+    exp_vals = [exports['Value ($)'].get(l, 0) for l in order]
+    imp_vals = [imports['Value ($)'].get(l, 0) for l in order]
+    exp_pcts = [round(v / total_all * 100, 1) if total_all > 0 else 0
+                for v in exp_vals]
+    imp_pcts = [round(v / total_all * 100, 1) if total_all > 0 else 0
+                for v in imp_vals]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=order, x=exp_vals, name='Exports',
+        orientation='h', marker_color=EXPORT_COLOR,
+        text=[f'{p}%' for p in exp_pcts],
         textposition='outside',
-        marker_color=COLORS_10[:len(hs2)],
+        hovertemplate='%{y}<br>Exports: %{x:.2s} (%{text})<extra></extra>',
     ))
+    fig.add_trace(go.Bar(
+        y=order, x=imp_vals, name='Imports',
+        orientation='h', marker_color=IMPORT_COLOR,
+        text=[f'{p}%' for p in imp_pcts],
+        textposition='outside',
+        hovertemplate='%{y}<br>Imports: %{x:.2s} (%{text})<extra></extra>',
+    ))
+
+    max_val = max(max(exp_vals, default=0), max(imp_vals, default=0))
+    tick_vals = np.linspace(0, max_val, 5) if max_val > 0 else [0]
+
     fig.update_layout(
-        xaxis=dict(visible=False),
-        yaxis=dict(tickfont=dict(size=12)),
-        margin=dict(l=0, r=60, t=10, b=10),
+        barmode='group',
+        xaxis=dict(
+            tickvals=tick_vals,
+            ticktext=[_fmt(v) for v in tick_vals],
+        ),
+        yaxis=dict(tickfont=dict(size=10)),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02),
+        margin=dict(l=0, r=80, t=30, b=10),
         template='plotly_white',
-        showlegend=False,
+        height=320,
     )
     return fig
 
@@ -430,6 +475,11 @@ def build_top_partners_bar(filtered_kpi):
 # HS2 TREEMAP — two-level: Section → HS2
 # ══════════════════════════════════════════════════════════════════════════════
 def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None):
+    """
+    Two-level treemap: Section (parent) → HS2 description (child).
+    Top level always shows Sections. Clicking a Section reveals its HS2 codes.
+    When hs2_to_section/description not provided, falls back to flat HS2 view.
+    """
     hs2 = (
         filtered_kpi
         .groupby('HS2', observed=True)['Value ($)']
@@ -441,27 +491,47 @@ def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None
     hs2['hs2_str'] = hs2['HS2'].astype(str).str.zfill(2)
 
     if hs2_to_section and hs2_to_description:
-        # Two-level treemap: Section → HS2
         hs2['section']     = hs2['hs2_str'].map(hs2_to_section).fillna('Other')
         hs2['description'] = hs2['hs2_str'].map(hs2_to_description).fillna(hs2['hs2_str'])
 
         section_totals = hs2.groupby('section')['Value ($)'].sum().reset_index()
         total = hs2['Value ($)'].sum()
 
+        # Section level (parents = '') + HS2 level (parents = section name)
         labels  = section_totals['section'].tolist() + hs2['description'].tolist()
         parents = [''] * len(section_totals) + hs2['section'].tolist()
         values  = section_totals['Value ($)'].tolist() + hs2['Value ($)'].tolist()
+        ids     = section_totals['section'].tolist() + \
+                  (hs2['section'] + ' / ' + hs2['description']).tolist()
         pcts    = [round(v / total * 100, 1) for v in values]
+
+        # Colour sections distinctly
+        section_colors = [
+            '#264653','#2A9D8F','#52B788','#84A59D','#E9C46A',
+            '#F4A261','#E76F51','#D62828','#6D597A','#457B9D',
+            '#1A4731','#A8DADC','#457B9D','#E63946','#F1FAEE',
+            '#A8C4E0','#2B2D42','#8D99AE',
+        ]
+        section_list   = section_totals['section'].tolist()
+        section_color_map = {s: section_colors[i % len(section_colors)]
+                             for i, s in enumerate(section_list)}
+
+        marker_colors = [section_color_map.get(s, '#457B9D')
+                         for s in section_list] + \
+                        [section_color_map.get(s, '#457B9D')
+                         for s in hs2['section'].tolist()]
     else:
-        # Flat treemap fallback using HS2_LABELS
         hs2['label'] = hs2['hs2_str'].apply(lambda x: HS2_LABELS.get(x, x))
-        total  = hs2['Value ($)'].sum()
+        total   = hs2['Value ($)'].sum()
         labels  = hs2['label'].tolist()
+        ids     = hs2['label'].tolist()
         parents = [''] * len(hs2)
         values  = hs2['Value ($)'].tolist()
-        pcts    = [(v / total * 100) for v in values]
+        pcts    = [round(v / total * 100, 1) for v in values]
+        marker_colors = COLORS_10[:len(hs2)]
 
     fig = go.Figure(go.Treemap(
+        ids=ids,
         labels=labels,
         parents=parents,
         values=values,
@@ -472,13 +542,14 @@ def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None
             'Value: %{value:.2s}<br>'
             'Share: %{customdata:.1f}%<extra></extra>'
         ),
-        marker=dict(colorscale='Teal', showscale=False),
+        marker=dict(colors=marker_colors, showscale=False),
         textfont=dict(size=11, color='white'),
         branchvalues='total',
+        maxdepth=1,   # start at Section level — click to expand
     ))
     fig.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
-        height=260,
+        height=300,
     )
     return fig
 
@@ -588,3 +659,285 @@ def build_import_origins(filtered_df):
 def build_key_insights(*args, **kwargs):
     return go.Figure()
 
+
+
+
+
+"""
+Commodity detail panel chart functions.
+
+"""
+
+
+EXPORT_COLOR = '#52B788'
+IMPORT_COLOR = '#1A4731'
+
+
+# ── Commodity KPIs ────────────────────────────────────────────────────────────
+def get_commodity_kpis(filtered_df, full_df, commodity_name):
+    """
+    Returns dict of KPI values for a specific commodity.
+    """
+    sub = filtered_df[filtered_df['Commodity'] == commodity_name].copy()
+
+    if sub.empty:
+        return None
+
+    total_value    = sub['Value ($)'].sum()
+    total_quantity = sub['Quantity'].sum()
+    unit           = sub['Unit of measure'].mode()[0] if not sub.empty else 'N/A'
+
+    # Avg price per unit
+    price_df = sub[(sub['Quantity'] > 0) & (sub['Unit of measure'] != 'Blank')].copy()
+    if not price_df.empty:
+        price_df['ppu'] = price_df['Value ($)'] / price_df['Quantity']
+        avg_price = price_df['ppu'].median()
+    else:
+        avg_price = None
+
+    # YoY avg price change — same period prior year
+    current_periods = sub[['Period']].drop_duplicates().copy()
+    current_periods['year']      = current_periods['Period'].dt.year
+    current_periods['month']     = current_periods['Period'].dt.month
+    current_periods['prev_year'] = current_periods['year'] - 1
+
+    full_sub = full_df[
+        (full_df['Commodity'] == commodity_name) &
+        (full_df['Quantity'] > 0) &
+        (full_df['Unit of measure'] != 'Blank')
+    ].copy()
+    full_sub['year']  = full_sub['Period'].dt.year
+    full_sub['month'] = full_sub['Period'].dt.month
+    full_sub['ppu']   = full_sub['Value ($)'] / full_sub['Quantity']
+
+    prev_rows = []
+    for _, row in current_periods.iterrows():
+        match = full_sub[
+            (full_sub['year']  == row['prev_year']) &
+            (full_sub['month'] == row['month'])
+        ]
+        prev_rows.append(match)
+
+    yoy_price = None
+    if prev_rows:
+        prev_df = pd.concat(prev_rows)
+        expected = len(current_periods)
+        found    = prev_df[['year', 'month']].drop_duplicates().shape[0] \
+                   if not prev_df.empty else 0
+        if found == expected and avg_price is not None and not prev_df.empty:
+            prev_avg = prev_df['ppu'].median()
+            if prev_avg > 0:
+                yoy_price = (avg_price - prev_avg) / prev_avg * 100
+
+    return {
+        'total_value':    total_value,
+        'total_quantity': total_quantity,
+        'unit':           unit,
+        'avg_price':      avg_price,
+        'yoy_price':      yoy_price,
+    }
+
+
+# ── Price Distribution Histogram ──────────────────────────────────────────────
+def build_price_histogram(filtered_df, commodity_name):
+    sub = filtered_df[
+        (filtered_df['Commodity'] == commodity_name) &
+        (filtered_df['Quantity'] > 0) &
+        (filtered_df['Unit of measure'] != 'Blank')
+    ].copy()
+
+    if sub.empty:
+        return go.Figure()
+
+    sub['ppu'] = sub['Value ($)'] / sub['Quantity']
+
+    # Remove extreme outliers (top 1%) for readable histogram
+    upper = sub['ppu'].quantile(0.99)
+    sub   = sub[sub['ppu'] <= upper]
+
+    fig = go.Figure(go.Histogram(
+        x=sub['ppu'],
+        nbinsx=30,
+        marker_color='#2A9D8F',
+        opacity=0.8,
+    ))
+
+    avg = sub['ppu'].median()
+    fig.add_vline(
+        x=avg,
+        line_dash='dash',
+        line_color='#C00000',
+        annotation_text=f'Median: {_fmt(avg)}/unit',
+        annotation_position='top right',
+        annotation_font=dict(size=11, color='#C00000'),
+    )
+
+    fig.update_layout(
+        xaxis=dict(title='Price per Unit (CAD)', tickprefix='$', tickformat=','),
+        yaxis=dict(title='Frequency'),
+        template='plotly_white',
+        margin=dict(t=20, b=40, l=40, r=20),
+        height=260,
+        showlegend=False,
+    )
+    return fig
+
+
+# ── Avg Price Over Time ───────────────────────────────────────────────────────
+def build_price_over_time(filtered_df, commodity_name):
+    sub = filtered_df[
+        (filtered_df['Commodity'] == commodity_name) &
+        (filtered_df['Quantity'] > 0) &
+        (filtered_df['Unit of measure'] != 'Blank')
+    ].copy()
+
+    if sub.empty:
+        return go.Figure()
+
+    sub['ppu']   = sub['Value ($)'] / sub['Quantity']
+    sub['year']  = sub['Period'].dt.year
+    sub['month'] = sub['Period'].dt.month
+
+    monthly = (
+        sub.groupby(['year', 'month'])['ppu']
+        .median().reset_index()
+        .sort_values(['year', 'month'])
+    )
+    monthly['label'] = monthly.apply(
+        lambda r: f"{calendar.month_abbr[int(r['month'])]} {int(r['year'])}", axis=1
+    )
+
+    fig = go.Figure(go.Scatter(
+        x=monthly['label'],
+        y=monthly['ppu'],
+        mode='lines+markers',
+        line=dict(color='#1A4731', width=2),
+        marker=dict(size=5, color='#1A4731'),
+        hovertemplate='%{x}<br>Avg Price: $%{y:,.0f}/unit<extra></extra>',
+    ))
+
+    fig.update_layout(
+        xaxis=dict(tickangle=-30, tickfont=dict(size=10)),
+        yaxis=dict(title='Avg Price/Unit (CAD)', tickprefix='$', tickformat=','),
+        template='plotly_white',
+        margin=dict(t=20, b=60, l=60, r=20),
+        height=260,
+    )
+    return fig
+
+
+# ── Seasonality Chart ─────────────────────────────────────────────────────────
+def build_seasonality_chart(filtered_df, commodity_name):
+    """
+    Average trade value by calendar month across all years in the filtered range.
+    Shows seasonal patterns.
+    """
+    sub = filtered_df[filtered_df['Commodity'] == commodity_name].copy()
+
+    if sub.empty:
+        return go.Figure()
+
+    sub['month'] = sub['Period'].dt.month
+
+    monthly_avg = (
+        sub.groupby('month')['Value ($)']
+        .mean().reset_index()
+    )
+    monthly_avg['label'] = monthly_avg['month'].apply(
+        lambda m: calendar.month_abbr[int(m)]
+    )
+
+    # Colour bars by value — higher = darker
+    max_val = monthly_avg['Value ($)'].max()
+    colors  = [
+        f'rgba(26, 71, 49, {0.4 + 0.6 * (v / max_val)})'
+        for v in monthly_avg['Value ($)']
+    ]
+
+    tick_vals = np.linspace(0, max_val, 5)
+
+    fig = go.Figure(go.Bar(
+        x=monthly_avg['label'],
+        y=monthly_avg['Value ($)'],
+        marker_color=colors,
+        hovertemplate='%{x}<br>Avg Value: %{y:.2s}<extra></extra>',
+    ))
+    fig.update_layout(
+        xaxis=dict(tickfont=dict(size=11)),
+        yaxis=dict(
+            tickvals=tick_vals,
+            ticktext=[_fmt(v) for v in tick_vals],
+        ),
+        template='plotly_white',
+        margin=dict(t=10, b=20, l=60, r=20),
+        height=260,
+    )
+    return fig
+
+
+# ── Top Export Destinations for Commodity ─────────────────────────────────────
+def build_commodity_export_destinations(filtered_df, commodity_name):
+    sub = filtered_df[
+        (filtered_df['Commodity'] == commodity_name) &
+        (filtered_df['trade_type'] == 'Export')
+    ]
+    if sub.empty:
+        return go.Figure()
+
+    top = (
+        sub.groupby('Country', observed=True)['Value ($)']
+        .sum().nlargest(8).reset_index()
+        .sort_values('Value ($)', ascending=True)
+    )
+    tick_vals = np.linspace(0, top['Value ($)'].max(), 5)
+
+    fig = go.Figure(go.Bar(
+        y=top['Country'], x=top['Value ($)'],
+        orientation='h', marker_color=EXPORT_COLOR,
+        text=[_fmt(v) for v in top['Value ($)']],
+        textposition='outside',
+        hovertemplate='%{y}<br>%{x:.2s}<extra></extra>',
+    ))
+    fig.update_layout(
+        xaxis=dict(tickvals=tick_vals, ticktext=[_fmt(v) for v in tick_vals],
+                   visible=False),
+        yaxis=dict(tickfont=dict(size=10)),
+        template='plotly_white',
+        margin=dict(t=10, b=10, l=0, r=60),
+        height=260,
+    )
+    return fig
+
+
+# ── Top Import Origins for Commodity ──────────────────────────────────────────
+def build_commodity_import_origins(filtered_df, commodity_name):
+    sub = filtered_df[
+        (filtered_df['Commodity'] == commodity_name) &
+        (filtered_df['trade_type'] == 'Import')
+    ]
+    if sub.empty:
+        return go.Figure()
+
+    top = (
+        sub.groupby('Country', observed=True)['Value ($)']
+        .sum().nlargest(8).reset_index()
+        .sort_values('Value ($)', ascending=True)
+    )
+    tick_vals = np.linspace(0, top['Value ($)'].max(), 5)
+
+    fig = go.Figure(go.Bar(
+        y=top['Country'], x=top['Value ($)'],
+        orientation='h', marker_color=IMPORT_COLOR,
+        text=[_fmt(v) for v in top['Value ($)']],
+        textposition='outside',
+        hovertemplate='%{y}<br>%{x:.2s}<extra></extra>',
+    ))
+    fig.update_layout(
+        xaxis=dict(tickvals=tick_vals, ticktext=[_fmt(v) for v in tick_vals],
+                   visible=False),
+        yaxis=dict(tickfont=dict(size=10)),
+        template='plotly_white',
+        margin=dict(t=10, b=10, l=0, r=60),
+        height=260,
+    )
+    return fig
