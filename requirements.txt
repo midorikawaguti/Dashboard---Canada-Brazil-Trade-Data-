@@ -3,4 +3,3 @@ plotly
 gunicorn
 pandas
 numpy
-calendar
