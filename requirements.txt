@@ -3,3 +3,4 @@ plotly
 gunicorn
 pandas
 numpy
+pyarrow
