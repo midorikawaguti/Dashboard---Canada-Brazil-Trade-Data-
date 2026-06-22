@@ -1,17 +1,13 @@
 from dash import html, dcc
 
-from .data import df, date_range_label, hs2_options_labeled, period_labels
+from .data import df, date_range_label, period_labels
 from .styles import (
     DARK_GREEN, WHITE, LIGHT_GRAY, MID_GRAY,
-    FONT_MAIN, FONT_BODY,
-    STYLE_DROPDOWN_ROW, STYLE_DROPDOWN_CHILD, STYLE_DROPDOWN_LABEL,
-    NAV_LINK_STYLE,
+    FONT_BODY,
 )
 
-# from .pages.overview import layout as overview_layout
-# from .pages.products import layout as product_layout
-# from .pages.geography import layout as geography_layout
-
+SIDEBAR_WIDTH  = '220px'
+CONTENT_MARGIN = '220px'
 
 
 def create_layout():
@@ -25,198 +21,237 @@ def create_layout():
         },
         children=[
 
-            # URL tracker (invisible — needed for page routing)
             dcc.Location(id='url', refresh=False),
 
-            # ── Header ────────────────────────────────────────────────────────
+            # ── LEFT SIDEBAR ──────────────────────────────────────────────────
             html.Div(
                 style={
-                    'backgroundColor': DARK_GREEN,
-                    'padding':         '24px 32px',
-                    'display':         'flex',
-                    'justifyContent':  'space-between',
-                    'alignItems':      'center',
-                    'position':        'sticky',
+                    'position':        'fixed',
                     'top':             '0',
-                    'zIndex':          '1000',
-                },
-                children=[
-                    html.Div([
-                        html.H1('Canada Trade', style={
-                            'margin':        '0',
-                            'fontFamily':    FONT_MAIN,
-                            'fontSize':      '36px',
-                            'fontWeight':    'bold',
-                            'color':         WHITE,
-                            'letterSpacing': '0.5px',
-                        }),
-                        html.P(
-                            f'Total trade flow, balance, and year-over-year trend · {date_range_label}',
-                            style={
-                                'margin':    '4px 2px 2px 2px',
-                                'fontStyle': 'italic',
-                                'fontSize':  '14px',
-                                'color':     '#B2DFCC',
-                            }
-                        ),
-                    ]),
-
-                    # FCBB logo
-                    html.Div(
-                        style={'borderRadius': '4px', 'padding': '8px 12px'},
-                        children=[
-                            html.Img(src='/assets/P-Logo-FCBB.png', style={'height': '60px'}),
-                        ]
-                    ),
-                ]
-            ),
-
-
-            # ── Navbar ────────────────────────────────────────────────────────
-            html.Div(
-                style={
-                    'backgroundColor': WHITE,
-                    'padding':         '0 32px',
+                    'left':            '0',
+                    'bottom':          '0',
+                    'width':           SIDEBAR_WIDTH,
+                    'backgroundColor': DARK_GREEN,
                     'display':         'flex',
-                    'gap':             '8px',
-                    'borderBottom':    f'1px solid {MID_GRAY}',
-                    'position':        'sticky',
-                    'top':             '88px',
-                    'zIndex':          '999',
-                },
-                children=[
-                    dcc.Link('Overview',  href='/',          style=NAV_LINK_STYLE),
-                    dcc.Link('Products',  href='/products',  style=NAV_LINK_STYLE),
-                    dcc.Link('Geography', href='/geography', style=NAV_LINK_STYLE),
-                ]
-            ),
-
-            # ── Filters ───────────────────────────────────────────────────────
-            html.Div(
-                style={
-                    'backgroundColor': WHITE,
-                    'padding':         '12px 32px 16px 32px',
-                    'display':         'flex',
-                    'flexDirection':   'column',   # stack rows vertically
-                    'gap':             '12px',
-                    'position':        'sticky',
-                    'top':             '132px',
-                    'zIndex':          '998',
-                    'borderBottom':    f'1px solid {MID_GRAY}',
+                    'flexDirection':   'column',
+                    'zIndex':          '1100',
+                    'overflowY':       'auto',
                 },
                 children=[
 
-                    # ── Row 1 — Dropdowns ─────────────────────────────────────
+                    # ── Logo + title ───────────────────────────────────────────
                     html.Div(
                         style={
-                            'display':  'flex',
-                            'gap':      '12px',
-                            'width':    '100%',
-                            'flexWrap': 'wrap',
+                            'padding':      '24px 16px 20px 16px',
+                            'borderBottom': '1px solid rgba(255,255,255,0.1)',
+                            'textAlign':    'center',
                         },
                         children=[
+                            html.Img(
+                                src='/assets/P-Logo-FCBB.png',
+                                style={'height': '48px', 'marginBottom': '10px'}
+                            ),
+                            html.Div('Canada Trade Portfolio', style={
+                                'color':         WHITE,
+                                'fontSize':      '13px',
+                                'fontWeight':    'bold',
+                                'letterSpacing': '0.5px',
+                            }),
+                            html.Div('Dashboard', style={
+                                'color':    '#B2DFCC',
+                                'fontSize': '11px',
+                            }),
+                        ]
+                    ),
 
-                            html.Div([
-                                html.Label(style=STYLE_DROPDOWN_LABEL),
-                                dcc.Dropdown(
-                                    options=(
-                                        [{'label': 'HS2 Codes', 'value': 'ALL'}] +
-                                        hs2_options_labeled
-                                    ),
-                                    id='hs2-dropdown',
-                                    value=['ALL'],
-                                    multi=True,
-                                    style={'border': 'none', 'fontSize': '13px'},
-                                    className='slim-dropdown',
-                                ),
-                            ], style=STYLE_DROPDOWN_CHILD),
+                    # ── Nav links ──────────────────────────────────────────────
+                    html.Div(
+                        style={'padding': '16px 0', 'flex': '1'},
+                        children=[
 
-                            html.Div([
-                                html.Label( style=STYLE_DROPDOWN_LABEL),
-                                dcc.Dropdown(
-                                    options=(
-                                        [{'label': 'Provinces', 'value': 'ALL'}] +
-                                        [{'label': str(p), 'value': p}
-                                         for p in sorted(df['Province'].unique())]
-                                    ),
-                                    id='province-dropdown',
-                                    value=['ALL'],
-                                    multi=True,
-                                    style={'border': 'none', 'fontSize': '13px'},
-                                    className='slim-dropdown',
-                                ),
-                            ], style=STYLE_DROPDOWN_CHILD),
+                            dcc.Link(
+                                href='/',
+                                style={'textDecoration': 'none'},
+                                children=html.Div(
+                                    id='nav-overview',
+                                    style={
+                                        'display':      'flex',
+                                        'alignItems':   'center',
+                                        'gap':          '10px',
+                                        'padding':      '12px 20px',
+                                        'color':        WHITE,
+                                        'fontSize':     '14px',
+                                        'cursor':       'pointer',
+                                        'borderLeft':   '3px solid transparent',
+                                    },
+                                    children=[
+                                        html.Span('🏠', style={'fontSize': '16px'}),
+                                        html.Span('Overview'),
+                                    ]
+                                )
+                            ),
 
-                            html.Div([
-                                html.Label( style=STYLE_DROPDOWN_LABEL),
-                                dcc.Dropdown(
-                                    options=(
-                                        [{'label': 'Countries', 'value': 'ALL'}] +
-                                        [{'label': str(c), 'value': c}
-                                         for c in sorted(df['Country'].unique())]
-                                    ),
-                                    id='country-dropdown',
-                                    value=['ALL'],
-                                    multi=True,
-                                    style={'border': 'none', 'fontSize': '13px'},
-                                    className='slim-dropdown',
-                                ),
-                            ], style=STYLE_DROPDOWN_CHILD),
-
-                            html.Div([
-                                html.Label( style=STYLE_DROPDOWN_LABEL),
-                                dcc.Dropdown(
-                                    options=(
-                                        [{'label': 'Trade Type', 'value': 'ALL'}] +
-                                        [{'label': str(c), 'value': c}
-                                         for c in sorted(df['trade_type'].unique())]
-                                    ),
-                                    id='trade-type-dropdown',
-                                    value=['ALL'],
-                                    multi=True,
-                                    style={'border': 'none', 'fontSize': '13px'},
-                                    className='slim-dropdown',
-                                ),
-                            ], style=STYLE_DROPDOWN_CHILD),
+                            dcc.Link(
+                                href='/products',
+                                style={'textDecoration': 'none'},
+                                children=html.Div(
+                                    id='nav-products',
+                                    style={
+                                        'display':    'flex',
+                                        'alignItems': 'center',
+                                        'gap':        '10px',
+                                        'padding':    '12px 20px',
+                                        'color':      '#B2DFCC',
+                                        'fontSize':   '14px',
+                                        'cursor':     'pointer',
+                                        'borderLeft': '3px solid transparent',
+                                    },
+                                    children=[
+                                        html.Span('📦', style={'fontSize': '16px'}),
+                                        html.Span('Products'),
+                                    ]
+                                )
+                            ),
 
                         ]
                     ),
 
-                    # ── Row 2 — Period slider ──────────────────────────────────
+                    # ── Data as of ─────────────────────────────────────────────
                     html.Div(
-                        style={'width': '100%', 'paddingBottom': '8px'},
+                        style={
+                            'padding':   '16px',
+                            'borderTop': '1px solid rgba(255,255,255,0.1)',
+                            'color':     '#B2DFCC',
+                            'fontSize':  '11px',
+                            'textAlign': 'center',
+                        },
                         children=[
-                            html.Label(style=STYLE_DROPDOWN_LABEL),
-                            dcc.RangeSlider(
-                                id='period-slider',
-                                min=0,
-                                max=len(period_labels) - 1,
-                                step=1,
-                                value=[0, len(period_labels) - 1],
-                                marks={
-                                    i: {'label': label, 'style': {'fontSize': '11px'}}
-                                    for i, label in enumerate(period_labels)
-                                    if i % 3 == 0
-                                },
-                                tooltip=None,
+                            html.Div('Data as of'),
+                            html.Div(
+                                date_range_label,
+                                style={'fontWeight': 'bold', 'color': WHITE,
+                                       'fontSize': '12px'}
                             ),
                         ]
                     ),
-                
-                    
 
                 ]
             ),
 
-            # ── Page content (swapped by routing callback) ────────────────────
-            html.Div(id='page-content'),
-            # overview_layout(),
+            # ── MAIN CONTENT AREA ─────────────────────────────────────────────
+            html.Div(
+                style={
+                    'marginLeft':    CONTENT_MARGIN,
+                    'minHeight':     '100vh',
+                    'display':       'flex',
+                    'flexDirection': 'column',
+                },
+                children=[
 
-            # product_layout(),
+                    # ── TOP FILTER BAR ─────────────────────────────────────────
+                    html.Div(
+                        style={
+                            'backgroundColor': WHITE,
+                            'padding':         '10px 24px',
+                            'display':         'flex',
+                            'gap':             '12px',
+                            'alignItems':      'center',
+                            'flexWrap':        'wrap',
+                            'borderBottom':    f'1px solid {MID_GRAY}',
+                            'position':        'sticky',
+                            'top':             '0',
+                            'zIndex':          '1000',
+                            'boxShadow':       '0 1px 4px rgba(0,0,0,0.06)',
+                        },
+                        children=[
 
-            # geography_layout(),
+                            # Province
+                            html.Div([
+                                dcc.Dropdown(
+                                    id='province-dropdown',
+                                    options=(
+                                        [{'label': 'All Provinces', 'value': 'ALL'}] +
+                                        [{'label': p, 'value': p}
+                                         for p in sorted(df['Province'].unique())]
+                                    ),
+                                    value=['ALL'],
+                                    multi=True,
+                                    placeholder='Province',
+                                    style={'border': 'none', 'fontSize': '13px',
+                                           'minWidth': '160px'},
+                                    className='slim-dropdown',
+                                ),
+                            ]),
+
+                            # Country
+                            html.Div([
+                                dcc.Dropdown(
+                                    id='country-dropdown',
+                                    options=(
+                                        [{'label': 'All Countries', 'value': 'ALL'}] +
+                                        [{'label': c, 'value': c}
+                                         for c in sorted(df['Country'].unique())]
+                                    ),
+                                    value=['ALL'],
+                                    multi=True,
+                                    placeholder='Partner Country',
+                                    style={'border': 'none', 'fontSize': '13px',
+                                           'minWidth': '160px'},
+                                    className='slim-dropdown',
+                                ),
+                            ]),
+
+                            # Trade Type
+                            html.Div([
+                                dcc.Dropdown(
+                                    id='trade-type-dropdown',
+                                    options=(
+                                        [{'label': 'All Trade Types', 'value': 'ALL'}] +
+                                        [{'label': t, 'value': t}
+                                         for t in sorted(df['trade_type'].unique())]
+                                    ),
+                                    value=['ALL'],
+                                    multi=True,
+                                    placeholder='Trade Type',
+                                    style={'border': 'none', 'fontSize': '13px',
+                                           'minWidth': '140px'},
+                                    className='slim-dropdown',
+                                ),
+                            ]),
+
+                            # Period slider
+                            html.Div(
+                                style={
+                                    'flex':        '1',
+                                    'minWidth':    '260px',
+                                    'paddingTop':  '6px',
+                                },
+                                children=[
+                                    dcc.RangeSlider(
+                                        id='period-slider',
+                                        min=0,
+                                        max=len(period_labels) - 1,
+                                        step=1,
+                                        value=[0, len(period_labels) - 1],
+                                        marks={
+                                            i: {'label': label,
+                                                'style': {'fontSize': '10px'}}
+                                            for i, label in enumerate(period_labels)
+                                            if i % 4 == 0
+                                        },
+                                        tooltip=None,
+                                    ),
+                                ]
+                            ),
+
+                        ]
+                    ),
+
+                    # ── PAGE CONTENT (swapped by routing callback) ─────────────
+                    html.Div(id='page-content', style={'flex': '1'}),
+
+                ]
+            ),
 
         ]
-
-
     )
