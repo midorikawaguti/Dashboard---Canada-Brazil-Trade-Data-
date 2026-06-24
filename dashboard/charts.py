@@ -552,8 +552,63 @@ def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None
         height=300,
     )
     return fig
+# ══════════════════════════════════════════════════════════════════════════════
+# HS2 BAR CHART — two-level: Section → HS2
+# ══════════════════════════════════════════════════════════════════════════════
+def build_section_bar_chart(filtered_kpi, hs2_to_section=None):
+    """
+    Horizontal bar chart showing total trade value and % share
+    for each HS2 Section. Replaces the treemap.
+    """
+    hs2 = (
+        filtered_kpi
+        .groupby('HS2', observed=True)['Value ($)']
+        .sum().reset_index()
+    )
+    if hs2.empty:
+        return go.Figure()
 
+    hs2['hs2_str'] = hs2['HS2'].astype(str).str.zfill(2)
 
+    if hs2_to_section:
+        hs2['section'] = hs2['hs2_str'].map(hs2_to_section).fillna('Other')
+        grouped = hs2.groupby('section')['Value ($)'].sum().reset_index()
+        grouped.columns = ['Section', 'Value']
+    else:
+        hs2['section'] = hs2['hs2_str'].apply(lambda x: HS2_LABELS.get(x, x))
+        grouped = hs2.rename(columns={'section': 'Section', 'Value ($)': 'Value'})
+
+    total = grouped['Value'].sum()
+    grouped['pct'] = (grouped['Value'] / total * 100).round(1)
+    grouped = grouped.sort_values('Value', ascending=True)
+
+    fig = go.Figure(go.Bar(
+        y=grouped['Section'],
+        x=grouped['Value'],
+        orientation='h',
+        marker_color=COLORS_10 * (len(grouped) // len(COLORS_10) + 1),
+        text=[f'{_fmt(v)}  ({p}%)' for v, p in
+              zip(grouped['Value'], grouped['pct'])],
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Value: %{x:.2s}<br>Share: %{text}<extra></extra>',
+    ))
+
+    max_val = grouped['Value'].max()
+    tick_vals = np.linspace(0, max_val, 5)
+
+    fig.update_layout(
+        xaxis=dict(
+            tickvals=tick_vals,
+            ticktext=[_fmt(v) for v in tick_vals],
+            visible=False,
+        ),
+        yaxis=dict(tickfont=dict(size=11)),
+        template='plotly_white',
+        margin=dict(l=0, r=160, t=10, b=10),
+        height=360,
+        showlegend=False,
+    )
+    return fig
 # ══════════════════════════════════════════════════════════════════════════════
 # TRADE BALANCE BY PROVINCE — diverging bar
 # ══════════════════════════════════════════════════════════════════════════════

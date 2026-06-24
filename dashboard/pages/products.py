@@ -94,24 +94,24 @@ def layout():
             # ══════════════════════════════════════════════════════════════════
             # ROW 1 — Treemap (Section level) + HS2 Share bar
             # ══════════════════════════════════════════════════════════════════
-            html.Div(
-                style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
-                children=[
+            # html.Div(
+            #     style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+            #     children=[
 
-                    html.Div(
-                        style={**STYLE_CHART_ITEM, 'flex': '1'},
-                        children=[
-                            html.H4('Trade Composition by Section', style=FIGURE_TITLE),
-                            html.P(
-                                'Shows HS2 Sections — click a section or use dropdown above to filter',
-                                style=FIGURE_DESCRIPTION
-                            ),
-                            dcc.Graph(
-                                id='products-treemap',
-                                config={'displayModeBar': False},
-                            ),
-                        ]
-                    ),
+            #         html.Div(
+            #             style={**STYLE_CHART_ITEM, 'flex': '1'},
+            #             children=[
+            #                 html.H4('Trade Composition by Section', style=FIGURE_TITLE),
+            #                 html.P(
+            #                     'Shows HS2 Sections — click a section or use dropdown above to filter',
+            #                     style=FIGURE_DESCRIPTION
+            #                 ),
+            #                 dcc.Graph(
+            #                     id='products-treemap',
+            #                     config={'displayModeBar': False},
+            #                 ),
+            #             ]
+            #         ),
 
                     # html.Div(
                     #     style={**STYLE_CHART_ITEM, 'flex': '1'},
@@ -128,10 +128,32 @@ def layout():
                     #     ]
                     # ),
 
+            #     ]
+            # ),
+
+            # ══════════════════════════════════════════════════════════════════
+            # ROW 1 — Treemap (Section level) + HS2 Share bar
+            # ══════════════════════════════════════════════════════════════════
+            html.Div(
+                style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+                children=[
+
+                    html.Div(
+                        style={**STYLE_CHART_ITEM, 'flex': '1'},
+                        children=[
+                            html.H4('Trade Composition by Section', style=FIGURE_TITLE),
+                            html.P(
+                                'Total value and % share per HS2 section — click dropdown or select above',
+                                style=FIGURE_DESCRIPTION
+                            ),
+                            dcc.Graph(
+                                id='products-section-bar',
+                                config={'displayModeBar': False},
+                            ),
+                        ]
+                    ),
                 ]
             ),
-
-
             # ══════════════════════════════════════════════════════════════════
             # ROW 1 — Treemap (Section level) + HS2 Share bar
             # ══════════════════════════════════════════════════════════════════
