@@ -715,9 +715,6 @@ def build_key_insights(*args, **kwargs):
     return go.Figure()
 
 
-
-
-
 """
 Commodity detail panel chart functions.
 
@@ -996,3 +993,181 @@ def build_commodity_import_origins(filtered_df, commodity_name):
         height=260,
     )
     return fig
+
+"""
+============================================================
+Butterfly Chart
+============================================================
+"""
+
+def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
+    """
+    Butterfly (back-to-back) horizontal bar chart.
+    Imports go LEFT, Exports go RIGHT.
+    Selected section is highlighted, others dimmed.
+    Clicking a bar syncs to the section dropdown.
+    """
+    hs2 = (
+        filtered_kpi
+        .groupby(['HS2', 'trade_type'], observed=True)['Value ($)']
+        .sum().reset_index()
+    )
+    if hs2.empty:
+        return go.Figure()
+
+    hs2['hs2_str'] = hs2['HS2'].astype(str).str.zfill(2)
+    hs2['section'] = hs2['hs2_str'].map(hs2_to_section).fillna('Other')
+
+    section = (
+        hs2.groupby(['section', 'trade_type'])['Value ($)']
+        .sum().reset_index()
+    )
+    pivot = section.pivot_table(
+        index='section', columns='trade_type',
+        values='Value ($)', aggfunc='sum'
+    ).fillna(0).reset_index()
+    pivot.columns.name = None
+
+    if 'Export' not in pivot.columns:
+        pivot['Export'] = 0
+    if 'Import' not in pivot.columns:
+        pivot['Import'] = 0
+
+    pivot['total']   = pivot['Export'] + pivot['Import']
+    pivot['exp_pct'] = (pivot['Export'] / pivot['total'] * 100).round(1)
+    pivot['imp_pct'] = (pivot['Import'] / pivot['total'] * 100).round(1)
+    pivot = pivot.sort_values('total', ascending=True)
+
+    total_all = pivot['total'].sum()
+    total_exp = pivot['Export'].sum()
+    total_imp = pivot['Import'].sum()
+    balance   = total_exp - total_imp
+    bal_str   = f'▲ {_fmt(abs(balance))} Surplus' \
+                if balance >= 0 \
+                else f'▼ {_fmt(abs(balance))} Deficit'
+    bal_color = '#1A4731' if balance >= 0 else '#C00000'
+
+    sections = pivot['section'].tolist()
+
+    # Highlight selected section, dim others
+    def imp_color(s):
+        if selected_section is None:
+            return '#2C5F8A'
+        return '#2C5F8A' if s == selected_section else 'rgba(44,95,138,0.2)'
+
+    def exp_color(s):
+        if selected_section is None:
+            return '#1A4731'
+        return '#1A4731' if s == selected_section else 'rgba(26,71,49,0.2)'
+
+    fig = go.Figure()
+
+    # ── Imports (left side — negative x) ──────────────────────────────────────
+    fig.add_trace(go.Bar(
+        y=sections,
+        x=[-v for v in pivot['Import']],
+        name='Imports',
+        orientation='h',
+        marker_color=[imp_color(s) for s in sections],
+        text=[f'{_fmt(v)}  ({p}%)'
+              for v, p in zip(pivot['Import'], pivot['imp_pct'])],
+        textposition='outside',
+        textfont=dict(size=10, color='#333333'),
+        customdata=list(zip(
+            [_fmt(v) for v in pivot['Import']],
+            pivot['imp_pct'],
+            sections,
+        )),
+        hovertemplate=(
+            '<b>%{y}</b><br>'
+            'Imports: %{customdata[0]}<br>'
+            'Share of section: %{customdata[1]}%'
+            '<extra></extra>'
+        ),
+    ))
+
+    # ── Exports (right side — positive x) ─────────────────────────────────────
+    fig.add_trace(go.Bar(
+        y=sections,
+        x=pivot['Export'],
+        name='Exports',
+        orientation='h',
+        marker_color=[exp_color(s) for s in sections],
+        text=[f'{_fmt(v)}  ({p}%)'
+              for v, p in zip(pivot['Export'], pivot['exp_pct'])],
+        textposition='outside',
+        textfont=dict(size=10, color='#333333'),
+        customdata=list(zip(
+            [_fmt(v) for v in pivot['Export']],
+            pivot['exp_pct'],
+            sections,
+        )),
+        hovertemplate=(
+            '<b>%{y}</b><br>'
+            'Exports: %{customdata[0]}<br>'
+            'Share of section: %{customdata[1]}%'
+            '<extra></extra>'
+        ),
+    ))
+
+    max_val   = max(pivot['Export'].max(), pivot['Import'].max())
+    tick_vals = list(np.linspace(-max_val, max_val, 9))
+    tick_text = [_fmt(abs(v)) for v in tick_vals]
+
+    fig.update_layout(
+        barmode='overlay',
+        xaxis=dict(
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            zeroline=True,
+            zerolinecolor='#AAAAAA',
+            zerolinewidth=1.5,
+        ),
+        yaxis=dict(tickfont=dict(size=11)),
+        legend=dict(
+            orientation='h', yanchor='bottom', y=1.06,
+            xanchor='center', x=0.5,
+        ),
+        template='plotly_white',
+        annotations=[
+            # Column headers
+            dict(x=0.25, y=1.05, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text='<b>IMPORTS</b>',
+                 font=dict(size=14, color='#2C5F8A')),
+            dict(x=0.75, y=1.05, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text='<b>EXPORTS</b>',
+                 font=dict(size=14, color='#1A4731')),
+            # Footer summary
+            dict(x=0.10, y=-0.10, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text=f'<b>Total Imports</b><br>'
+                      f'<span style="font-size:15px"><b>{_fmt(total_imp)}</b></span><br>'
+                      f'<span style="color:gray">({total_imp/total_all*100:.1f}%)</span>',
+                 font=dict(size=11, color='#2C5F8A')),
+            dict(x=0.36, y=-0.10, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text=f'<b>Total Trade</b><br>'
+                      f'<span style="font-size:15px"><b>{_fmt(total_all)}</b></span><br>'
+                      f'<span style="color:gray">(100%)</span>',
+                 font=dict(size=11, color='#333333')),
+            dict(x=0.63, y=-0.10, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text=f'<b>Total Exports</b><br>'
+                      f'<span style="font-size:15px"><b>{_fmt(total_exp)}</b></span><br>'
+                      f'<span style="color:gray">({total_exp/total_all*100:.1f}%)</span>',
+                 font=dict(size=11, color='#1A4731')),
+            dict(x=0.88, y=-0.10, xref='paper', yref='paper',
+                 showarrow=False, align='center',
+                 text=f'<b>Trade Balance</b><br>'
+                      f'<span style="font-size:15px"><b>{bal_str}</b></span>',
+                 font=dict(size=11, color=bal_color)),
+        ],
+        margin=dict(t=60, b=110, l=0, r=180),
+        height=max(500, len(sections) * 30 + 180),
+        clickmode='event+select',
+    )
+    return fig
+
+

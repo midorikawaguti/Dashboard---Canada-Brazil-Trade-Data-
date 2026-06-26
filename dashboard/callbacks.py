@@ -1,4 +1,4 @@
-from dash import html, dcc, Input, Output
+from dash import html, dcc, Input, Output, ctx
 
 from .data import df, df_kpi, df_kpi_commodity, period_index, \
                   hs2_to_section, hs2_to_description
@@ -26,6 +26,7 @@ from .charts import (
     build_seasonality_chart,
     build_commodity_export_destinations,
     build_commodity_import_origins,
+    build_butterfly_chart
 )
 from .styles import (
     KPI_STYLE_VALUE, KPI_TEXT_VALUE, KPI_NOTE,
@@ -168,24 +169,36 @@ def register_callbacks(app):
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — LEVEL 1: Section selection synced with treemap click
+    # PRODUCTS — LEVEL 1: Section selection synced with butterfly chart click
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-section-select', 'value'),
-        Input('products-treemap', 'clickData'),
+        Input('products-butterfly',       'clickData'),   # click on butterfly bar
+        Input('products-section-select',  'value'),       # dropdown change
         prevent_initial_call=True,
     )
-    def sync_treemap_to_dropdown(click_data):
-        """When user clicks a section in the treemap, update the section dropdown."""
-        if not click_data:
-            return None
-        clicked_label = click_data['points'][0].get('label', None)
-        # Only accept section-level clicks (parents are empty string)
-        parent = click_data['points'][0].get('parent', None)
-        if parent == '':
-            return clicked_label
-        # If clicked on HS2 child, return its parent section
-        return parent if parent else None
+    def sync_butterfly_to_section(click_data, current_section):
+        """
+        Two-way sync between butterfly chart and section dropdown.
+        - Clicking a bar in the butterfly chart updates the dropdown.
+        - If dropdown was changed by user, respect it and do nothing.
+        - Clicking the already-selected section deselects it (toggle).
+        """
+        # If the dropdown itself triggered this, don't override it
+        if ctx.triggered_id == 'products-section-select':
+            return current_section
+
+        # Butterfly bar was clicked
+        if click_data:
+            point           = click_data['points'][0]
+            clicked_section = point.get('y')   # section name is on y axis
+            if clicked_section:
+                # Toggle: clicking selected section again clears the filter
+                if clicked_section == current_section:
+                    return None
+                return clicked_section
+
+        return current_section
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRODUCTS — LEVEL 2: HS2 dropdown options based on selected section
@@ -232,8 +245,9 @@ def register_callbacks(app):
         Output('number-commodities', 'children'),
         #Output('products-avg-price', 'children'),
         # Charts
+        Output('products-butterfly',           'figure'),
         #Output('products-treemap',             'figure'),
-        Output('products-section-bar', 'figure'),
+        #Output('products-section-bar',         'figure'),
         Output('hs2-share-chart-products',     'figure'),
         #Output('top-commodity-table',          'data'),
         Output('top5-export-table-products',   'data'),
@@ -330,7 +344,8 @@ def register_callbacks(app):
             kpi_price = [html.H2('N/A', style=KPI_STYLE_VALUE)]
 
         # ── Charts ────────────────────────────────────────────────────────────
-        # Treemap always shows Section level (ignores hs2_filter)
+        # Butterfly + HS2 share always use section-level filter
+        # so the butterfly shows all sections even when an HS2 is selected
         filtered_kpi_sections = apply_filters(
             df_kpi, period_range, section_hs2_filter,
             selected_province, selected_country,
@@ -348,7 +363,12 @@ def register_callbacks(app):
             #kpi_price,
             # build_hs2_treemap(filtered_kpi_sections,
             #                   hs2_to_section, hs2_to_description),
-            build_section_bar_chart(filtered_kpi_sections, hs2_to_section),
+            # build_section_bar_chart(filtered_kpi_sections, hs2_to_section),
+            build_butterfly_chart(
+                filtered_kpi_sections,
+                hs2_to_section,
+                selected_section=selected_section   # highlights selected bar
+            ),
             build_hs2_share_chart(filtered_kpi),
             #build_top_commodity_table(filtered_commodity),
             export_records,

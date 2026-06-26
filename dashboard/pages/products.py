@@ -132,22 +132,46 @@ def layout():
             # ),
 
             # ══════════════════════════════════════════════════════════════════
-            # ROW 1 — Treemap (Section level) + HS2 Share bar
+            # ROW 1 — Bar chart
             # ══════════════════════════════════════════════════════════════════
-            html.Div(
+            # html.Div(
+            #     style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+            #     children=[
+
+            #         html.Div(
+            #             style={**STYLE_CHART_ITEM, 'flex': '1'},
+            #             children=[
+            #                 html.H4('Trade Composition by Section', style=FIGURE_TITLE),
+            #                 html.P(
+            #                     'Total value and % share per HS2 section — click dropdown or select above',
+            #                     style=FIGURE_DESCRIPTION
+            #                 ),
+            #                 dcc.Graph(
+            #                     id='products-section-bar',
+            #                     config={'displayModeBar': False},
+            #                 ),
+            #             ]
+            #         ),
+            #     ]
+            # ),
+            # ══════════════════════════════════════════════════════════════════
+            # ROW 1 — Butterfly Chart
+            # ══════════════════════════════════════════════════════════════════
+             html.Div(
                 style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
                 children=[
-
                     html.Div(
-                        style={**STYLE_CHART_ITEM, 'flex': '1'},
+                        style=STYLE_CHART_ITEM,
                         children=[
-                            html.H4('Trade Composition by Section', style=FIGURE_TITLE),
+                            html.H4('Trade Composition by Section — Butterfly Chart',
+                                    style=FIGURE_TITLE),
                             html.P(
-                                'Total value and % share per HS2 section — click dropdown or select above',
+                                'HS2 Sections ranked by total trade. '
+                                'Click a bar to filter the page to that section.',
                                 style=FIGURE_DESCRIPTION
                             ),
                             dcc.Graph(
-                                id='products-section-bar',
+                                id='products-butterfly',
                                 config={'displayModeBar': False},
                             ),
                         ]
@@ -428,3 +452,4 @@ def layout():
 
         ]
     )
+
