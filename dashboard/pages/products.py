@@ -49,7 +49,7 @@ def layout():
                         options=[{'label': s, 'value': s}
                                  for s in sorted(set(hs2_to_section.values()))],
                         value=None,
-                        placeholder='All sections — or click treemap to drill down…',
+                        placeholder='All sections',
                         multi=False,
                         clearable=True,
                         style={'flex': '1', 'fontSize': '13px', 'border': 'none'},
@@ -163,7 +163,7 @@ def layout():
                     html.Div(
                         style=STYLE_CHART_ITEM,
                         children=[
-                            html.H4('Trade Composition by Section — Butterfly Chart',
+                            html.H4('Trade Composition by Section',
                                     style=FIGURE_TITLE),
                             html.P(
                                 'HS2 Sections ranked by total trade. '
