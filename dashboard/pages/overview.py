@@ -152,7 +152,7 @@ def layout():
 
             # Top 5 partners bar
                     html.Div(
-                        style={**STYLE_CHART_ITEM, 'flex': '0.9'},
+                        style=STYLE_CHART_ITEM,
                         children=[
                             html.H4('Top 10 Trading Partners', style=FIGURE_TITLE),
                             html.P('By total trade value', style=FIGURE_DESCRIPTION),
