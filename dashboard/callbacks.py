@@ -1,4 +1,4 @@
-from dash import html, dcc, Input, Output, ctx
+from dash import html, dcc, Input, Output, State, ctx
 
 from .data import df, df_kpi, df_kpi_commodity, period_index, \
                   hs2_to_section, hs2_to_description
@@ -16,7 +16,6 @@ from .charts import (
     build_top_provinces_bar,
     build_top_partners_bar,
     build_hs2_treemap,
-    build_section_bar_chart,
     build_province_balance_bar,
     build_export_destinations,
     build_import_origins,
@@ -169,43 +168,49 @@ def register_callbacks(app):
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — LEVEL 1: Section selection synced with butterfly chart click
+    # PRODUCTS — LEVEL 1: Section synced with butterfly chart click
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-section-select', 'value'),
-        Input('products-butterfly',       'clickData'),   # click on butterfly bar
-        Input('products-section-select',  'value'),       # dropdown change
+        Input('products-butterfly',       'clickData'),
+        Input('products-section-select',  'value'),
         prevent_initial_call=True,
     )
     def sync_butterfly_to_section(click_data, current_section):
-        """
-        Two-way sync between butterfly chart and section dropdown.
-        - Clicking a bar in the butterfly chart updates the dropdown.
-        - If dropdown was changed by user, respect it and do nothing.
-        - Clicking the already-selected section deselects it (toggle).
-        """
-        # If the dropdown itself triggered this, don't override it
         if ctx.triggered_id == 'products-section-select':
             return current_section
-
-        # Butterfly bar was clicked
         if click_data:
             point           = click_data['points'][0]
-            clicked_section = point.get('y')   # section name is on y axis
+            clicked_section = point.get('y')
             if clicked_section:
-                # Toggle: clicking selected section again clears the filter
                 if clicked_section == current_section:
                     return None
                 return clicked_section
-
         return current_section
 
+    # ── Sync HS2 share chart click → HS2 dropdown ─────────────────────────────
+    @app.callback(
+        Output('products-hs2-select', 'value', allow_duplicate=True),
+        Input('hs2-share-chart-products', 'clickData'),
+        Input('products-hs2-select',      'value'),
+        prevent_initial_call=True,
+    )
+    def sync_hs2_chart_to_dropdown(click_data, current_hs2):
+        if ctx.triggered_id == 'products-hs2-select':
+            return current_hs2
+        if click_data:
+            clicked_hs2 = click_data['points'][0].get('customdata')
+            if clicked_hs2:
+                if str(clicked_hs2) == str(current_hs2):
+                    return None
+                return clicked_hs2
+        return current_hs2
+
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — LEVEL 2: HS2 dropdown options based on selected section
+    # PRODUCTS — LEVEL 2: HS2 dropdown OPTIONS only (not value)
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-hs2-select', 'options'),
-        Output('products-hs2-select', 'value'),
         Input('products-section-select', 'value'),
         Input('period-slider',           'value'),
         Input('province-dropdown',       'value'),
@@ -213,7 +218,6 @@ def register_callbacks(app):
     )
     def update_hs2_options(selected_section, period_range,
                            selected_province, selected_trade_type):
-        """Populate HS2 dropdown with codes that belong to the selected section."""
         hs2_filter = get_hs2_codes_for_section(selected_section, hs2_to_section)
 
         filtered = apply_filters(
@@ -223,53 +227,50 @@ def register_callbacks(app):
         )
 
         if filtered.empty:
-            return [], None
+            return []
 
-        # Get HS2 codes present in filtered data
         available_hs2 = filtered['HS2'].unique().tolist()
-
-        options = [
+        return [
             {'label': f"{code} – {HS2_LABELS.get(str(code), str(code))}",
              'value': code}
             for code in sorted(available_hs2)
         ]
-        return options, None   # reset HS2 selection when section changes
+
+    # ── Reset HS2 value ONLY when section changes ─────────────────────────────
+    @app.callback(
+        Output('products-hs2-select', 'value'),
+        Input('products-section-select', 'value'),
+        prevent_initial_call=True,
+    )
+    def reset_hs2_on_section_change(selected_section):
+        """Clear HS2 selection only when section changes."""
+        return None
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — Main charts/KPIs (update on section OR hs2 selection)
+    # PRODUCTS — Main charts/KPIs
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
-        # KPIs
-        Output('top-HS2',            'children'),
-        Output('fastest-growing',    'children'),
-        Output('number-commodities', 'children'),
-        #Output('products-avg-price', 'children'),
-        # Charts
+        Output('top-HS2',                      'children'),
+        Output('fastest-growing',              'children'),
+        Output('number-commodities',           'children'),
         Output('products-butterfly',           'figure'),
-        #Output('products-treemap',             'figure'),
-        #Output('products-section-bar',         'figure'),
         Output('hs2-share-chart-products',     'figure'),
-        #Output('top-commodity-table',          'data'),
         Output('top5-export-table-products',   'data'),
         Output('top5-import-table-products',   'data'),
         Output('products-export-destinations', 'figure'),
         Output('products-import-origins',      'figure'),
-        # Inputs — global filters
         Input('period-slider',           'value'),
         Input('province-dropdown',       'value'),
         Input('country-dropdown',        'value'),
         Input('trade-type-dropdown',     'value'),
-        # Inputs — page-specific
-        Input('products-section-select', 'value'),  # Level 1
-        Input('products-hs2-select',     'value'),  # Level 2
+        Input('products-section-select', 'value'),
+        Input('products-hs2-select',     'value'),
     )
     def update_products(period_range, selected_province, selected_country,
                         selected_trade_type, selected_section, selected_hs2):
 
-        # Level 1: filter by section → list of HS2 codes
         section_hs2_filter = get_hs2_codes_for_section(selected_section, hs2_to_section)
 
-        # Level 2: if specific HS2 selected, filter further to just that code
         if selected_hs2:
             hs2_filter = [selected_hs2]
         else:
@@ -285,8 +286,6 @@ def register_callbacks(app):
             selected_province, selected_country,
             selected_trade_type, period_index=period_index
         )
-        # Filter full df by hs2_filter (has HS2 column), then re-aggregate
-        # to commodity level — df_kpi_commodity has no HS2 column
         filtered_for_commodity = apply_filters(
             df, period_range, hs2_filter,
             selected_province, selected_country,
@@ -305,16 +304,12 @@ def register_callbacks(app):
         clean_name = HS2_LABELS.get(str(hs2_code), str(hs2_code)) \
                      if hs2_code else 'N/A'
         kpi_top_hs2 = [
-            html.P(clean_name[:28],
-                   style={**KPI_STYLE_VALUE, 'fontSize': '14px'}),
+            html.P(clean_name[:28], style={**KPI_STYLE_VALUE, 'fontSize': '14px'}),
             html.P(f'{pct_top:.1f}% of total trade', style=KPI_NOTE),
         ]
 
-        hs2_fast, pct_fast, note_fast = get_fastest_growing_hs2(
-            filtered_kpi, df_kpi
-        )
-        fast_label = HS2_LABELS.get(str(hs2_fast), str(hs2_fast)) \
-                     if hs2_fast else 'N/A'
+        hs2_fast, pct_fast, note_fast = get_fastest_growing_hs2(filtered_kpi, df_kpi)
+        fast_label = HS2_LABELS.get(str(hs2_fast), str(hs2_fast)) if hs2_fast else 'N/A'
         if pct_fast is not None:
             fast_str   = f'+{pct_fast:.1f}%' if pct_fast >= 0 else f'{pct_fast:.1f}%'
             fast_color = GREEN_TREND if pct_fast >= 0 else RED
@@ -322,8 +317,7 @@ def register_callbacks(app):
         else:
             fast_str, fast_color, fast_note = 'N/A', TEXT_GRAY, note_fast or ''
         kpi_fastest = [
-            html.P(fast_str,
-                   style={**KPI_STYLE_VALUE, 'color': fast_color}),
+            html.P(fast_str, style={**KPI_STYLE_VALUE, 'color': fast_color}),
             html.P(fast_label[:28], style=KPI_TEXT_VALUE),
             html.P(fast_note, style=KPI_NOTE),
         ]
@@ -331,21 +325,7 @@ def register_callbacks(app):
         n_commodities = filtered_commodity['Commodity'].nunique()
         kpi_commodities = [html.H2(f'{n_commodities:,}', style=KPI_STYLE_VALUE)]
 
-        price_df = filtered[
-            (filtered['Quantity'] > 0) &
-            (filtered['Unit of measure'] != 'Blank')
-        ].copy()
-        if not price_df.empty:
-            price_df['ppu'] = price_df['Value ($)'] / price_df['Quantity']
-            avg_price = price_df['ppu'].median()
-            kpi_price = [html.H2(f'{fmt_value(avg_price)}/unit',
-                                 style=KPI_STYLE_VALUE)]
-        else:
-            kpi_price = [html.H2('N/A', style=KPI_STYLE_VALUE)]
-
         # ── Charts ────────────────────────────────────────────────────────────
-        # Butterfly + HS2 share always use section-level filter
-        # so the butterfly shows all sections even when an HS2 is selected
         filtered_kpi_sections = apply_filters(
             df_kpi, period_range, section_hs2_filter,
             selected_province, selected_country,
@@ -360,17 +340,12 @@ def register_callbacks(app):
             kpi_top_hs2,
             kpi_fastest,
             kpi_commodities,
-            #kpi_price,
-            # build_hs2_treemap(filtered_kpi_sections,
-            #                   hs2_to_section, hs2_to_description),
-            # build_section_bar_chart(filtered_kpi_sections, hs2_to_section),
             build_butterfly_chart(
                 filtered_kpi_sections,
                 hs2_to_section,
-                selected_section=selected_section   # highlights selected bar
+                selected_section=selected_section
             ),
             build_hs2_share_chart(filtered_kpi),
-            #build_top_commodity_table(filtered_commodity),
             export_records,
             import_records,
             build_export_destinations(filtered),
@@ -378,27 +353,25 @@ def register_callbacks(app):
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — LEVEL 3: Commodity dropdown options
+    # PRODUCTS — LEVEL 3: Commodity dropdown OPTIONS only (not value)
+    # Updates the list but never touches the selected value
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-commodity-select', 'options'),
-        Output('products-commodity-select', 'value'),
-        Input('period-slider',          'value'),
-        Input('province-dropdown',      'value'),
-        Input('trade-type-dropdown',    'value'),
-        Input('products-hs2-select',    'value'),   # Level 2
-        Input('products-section-select','value'),   # Level 1 fallback
+        Input('period-slider',           'value'),
+        Input('province-dropdown',       'value'),
+        Input('trade-type-dropdown',     'value'),
+        Input('products-hs2-select',     'value'),
+        Input('products-section-select', 'value'),
     )
     def update_commodity_options(period_range, selected_province,
                                  selected_trade_type, selected_hs2,
                                  selected_section):
-        # Use HS2 filter if selected, else use section filter
         if selected_hs2:
             hs2_filter = [selected_hs2]
         else:
             hs2_filter = get_hs2_codes_for_section(selected_section, hs2_to_section)
 
-        # Filter df (has HS2 column), then re-aggregate to commodity level
         filtered_raw = apply_filters(
             df, period_range, hs2_filter,
             selected_province, None,
@@ -413,7 +386,7 @@ def register_callbacks(app):
         )
 
         if filtered.empty:
-            return [], None
+            return []
 
         top_commodities = (
             filtered
@@ -422,9 +395,19 @@ def register_callbacks(app):
             .nlargest(200)
             .index.tolist()
         )
-        options = [{'label': str(c)[:60], 'value': c}
-                   for c in sorted(top_commodities)]
-        return options, None
+        return [{'label': str(c)[:60], 'value': c}
+                for c in sorted(top_commodities)]
+
+    # ── Reset commodity value ONLY when section or HS2 changes ────────────────
+    @app.callback(
+        Output('products-commodity-select', 'value'),
+        Input('products-section-select', 'value'),
+        Input('products-hs2-select',     'value'),
+        prevent_initial_call=True,
+    )
+    def reset_commodity_on_drill_change(selected_section, selected_hs2):
+        """Clear commodity selection only when the drill-down level above changes."""
+        return None
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRODUCTS — LEVEL 3: Commodity detail panel
@@ -456,143 +439,302 @@ def register_callbacks(app):
                        style={'color': TEXT_GRAY, 'padding': '20px'}),
             )
 
-        avg_price_str = fmt_value(kpis['avg_price']) + '/unit' \
-                        if kpis['avg_price'] else 'N/A'
-
-        if kpis['yoy_price'] is not None:
-            yoy_str   = f'+{kpis["yoy_price"]:.1f}%' \
-                        if kpis['yoy_price'] >= 0 \
-                        else f'{kpis["yoy_price"]:.1f}%'
-            yoy_color = GREEN_TREND if kpis['yoy_price'] >= 0 else RED
-        else:
-            yoy_str, yoy_color = 'N/A', TEXT_GRAY
-
         short_name = str(selected_commodity)[:80] + '...' \
                      if len(str(selected_commodity)) > 80 \
                      else str(selected_commodity)
 
+        # ── Determine what data is available ──────────────────────────────────
+        sub         = filtered[filtered['Commodity'] == selected_commodity]
+        has_exports = not sub[sub['trade_type'] == 'Export'].empty
+        has_imports = not sub[sub['trade_type'] == 'Import'].empty
+        has_price   = kpis['avg_price'] is not None
+
+        # ── Trade direction banner ─────────────────────────────────────────────
+        if has_exports and has_imports:
+            dir_text  = '✅  Both Export and Import data available'
+            dir_color = '#1A4731'
+            dir_bg    = '#E8F5E9'
+        elif has_exports:
+            dir_text  = 'ℹ️  Export data only — no import records for this commodity in the selected period'
+            dir_color = '#1F4E79'
+            dir_bg    = '#E3F0FA'
+        elif has_imports:
+            dir_text  = 'ℹ️  Import data only — no export records for this commodity in the selected period'
+            dir_color = '#1F4E79'
+            dir_bg    = '#E3F0FA'
+        else:
+            dir_text  = '⚠️  No trade data found'
+            dir_color = '#C00000'
+            dir_bg    = '#FFF0F0'
+
+        # ── KPI tiles ─────────────────────────────────────────────────────────
+        avg_price_str = fmt_value(kpis['avg_price']) + '/unit' if has_price else None
+
+        if has_price and kpis['yoy_price'] is not None:
+            yoy_str   = f'+{kpis["yoy_price"]:.1f}%' if kpis['yoy_price'] >= 0 \
+                        else f'{kpis["yoy_price"]:.1f}%'
+            yoy_color = GREEN_TREND if kpis['yoy_price'] >= 0 else RED
+        else:
+            yoy_str, yoy_color = None, TEXT_GRAY
+
+        kpi_tiles = [
+            html.Div(style=KPI_STYLE_BOX, children=[
+                html.H2(fmt_value(kpis['total_value']), style=KPI_STYLE_VALUE),
+                html.P('Total Trade Value',
+                       style={'color': TEXT_GRAY, 'fontSize': '12px',
+                              'margin': '4px 0 0 0'}),
+            ]),
+            html.Div(style=KPI_STYLE_BOX, children=[
+                html.H2(f'{kpis["total_quantity"]:,.0f}', style=KPI_STYLE_VALUE),
+                html.P(f'Total Quantity ({kpis["unit"]})',
+                       style={'color': TEXT_GRAY, 'fontSize': '12px',
+                              'margin': '4px 0 0 0'}),
+            ]),
+        ]
+        if has_price:
+            kpi_tiles.append(html.Div(style=KPI_STYLE_BOX, children=[
+                html.H2(avg_price_str, style=KPI_STYLE_VALUE),
+                html.P('Avg Price per Unit',
+                       style={'color': TEXT_GRAY, 'fontSize': '12px',
+                              'margin': '4px 0 0 0'}),
+            ]))
+            if yoy_str:
+                kpi_tiles.append(html.Div(style=KPI_STYLE_BOX, children=[
+                    html.H2(yoy_str, style={**KPI_STYLE_VALUE, 'color': yoy_color}),
+                    html.P('YoY Price Change',
+                           style={'color': TEXT_GRAY, 'fontSize': '12px',
+                                  'margin': '4px 0 0 0'}),
+                    html.P('vs same period prior year',
+                           style={'color': TEXT_GRAY, 'fontSize': '10px',
+                                  'fontStyle': 'italic', 'margin': '2px 0 0 0'}),
+                ]))
+        else:
+            kpi_tiles.append(html.Div(
+                style={**KPI_STYLE_BOX, 'borderLeft': '3px solid #FFAA00',
+                       'backgroundColor': '#FFFBF0'}, children=[
+                html.P('⚠️  Price data unavailable',
+                       style={'color': '#AA6600', 'fontSize': '12px',
+                              'fontWeight': 'bold', 'margin': '0 0 4px 0'}),
+                html.P('Quantity = 0 for all records — price per unit cannot be computed',
+                       style={'color': TEXT_GRAY, 'fontSize': '11px', 'margin': '0'}),
+            ]))
+
+        # ── Price charts row ───────────────────────────────────────────────────
+        if has_price:
+            price_row = html.Div(
+                style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+                children=[
+                    html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
+                        html.H4('Price Distribution', style=FIGURE_TITLE),
+                        html.P('Frequency of price per unit', style=FIGURE_DESCRIPTION),
+                        dcc.Graph(figure=build_price_histogram(filtered, selected_commodity),
+                                  config={'displayModeBar': False}),
+                    ]),
+                    html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
+                        html.H4('Avg Price Over Time', style=FIGURE_TITLE),
+                        html.P('Monthly median price per unit', style=FIGURE_DESCRIPTION),
+                        dcc.Graph(figure=build_price_over_time(filtered, selected_commodity),
+                                  config={'displayModeBar': False}),
+                    ]),
+                    html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
+                        html.H4('Seasonality', style=FIGURE_TITLE),
+                        html.P('Avg monthly trade value across years',
+                               style=FIGURE_DESCRIPTION),
+                        dcc.Graph(figure=build_seasonality_chart(filtered, selected_commodity),
+                                  config={'displayModeBar': False}),
+                    ]),
+                ]
+            )
+        else:
+            price_row = html.Div(
+                style={'backgroundColor': '#FFFBF0', 'borderRadius': '8px',
+                       'padding': '14px 18px', 'margin': '0 0 16px 0',
+                       'border': '1px solid #FFDD99'},
+                children=[
+                    html.P('⚠️  Price charts not available',
+                           style={'color': '#AA6600', 'fontWeight': 'bold',
+                                  'margin': '0 0 4px 0', 'fontSize': '13px'}),
+                    html.P('Price distribution, avg price over time and seasonality '
+                           'require Quantity > 0 to compute price per unit. '
+                           'All records for this commodity have Quantity = 0.',
+                           style={'color': TEXT_GRAY, 'fontSize': '12px', 'margin': '0'}),
+                ]
+            )
+
+        # ── Destinations — only show available directions ──────────────────────
+        dest_children = []
+        if has_exports:
+            dest_children.append(html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
+                html.H4('Top Export Destinations', style=FIGURE_TITLE),
+                html.P('Countries buying this commodity from Canada',
+                       style=FIGURE_DESCRIPTION),
+                dcc.Graph(figure=build_commodity_export_destinations(
+                              filtered, selected_commodity),
+                          config={'displayModeBar': False}),
+            ]))
+        if has_imports:
+            dest_children.append(html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
+                html.H4('Top Import Origins', style=FIGURE_TITLE),
+                html.P('Countries supplying this commodity to Canada',
+                       style=FIGURE_DESCRIPTION),
+                dcc.Graph(figure=build_commodity_import_origins(
+                              filtered, selected_commodity),
+                          config={'displayModeBar': False}),
+            ]))
+        dest_row = html.Div(
+            style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+            children=dest_children
+        )
+
+        # ── Data quality stats ─────────────────────────────────────────────────
+        total_r     = len(sub)
+        valid_r     = len(sub[sub['Quantity'] > 0])
+        zero_r      = total_r - valid_r
+        blank_u     = len(sub[sub['Unit of measure'] == 'Blank']) \
+                      if 'Unit of measure' in sub.columns else 0
+        countries_n = sub['Country'].nunique() \
+                      if 'Country' in sub.columns else 0
+
+        data_quality = html.Div(
+            id='data-quality-panel',
+            style={'display': 'none'},
+            children=[
+                html.Hr(style={'margin': '16px 0', 'borderColor': '#E0E0E0'}),
+                html.H4('📊  Data Quality',
+                        style={'color': BLUE_ACCENT, 'fontSize': '14px',
+                               'margin': '0 0 12px 0'}),
+                html.Div(style={'display': 'flex', 'gap': '12px', 'flexWrap': 'wrap'},
+                         children=[
+                    html.Div(style={**KPI_STYLE_BOX, 'minWidth': '130px'}, children=[
+                        html.H3(f'{total_r:,}',
+                                style={**KPI_STYLE_VALUE, 'fontSize': '22px'}),
+                        html.P('Total Rows',
+                               style={'color': TEXT_GRAY, 'fontSize': '11px',
+                                      'margin': '4px 0 0 0'}),
+                    ]),
+                    html.Div(style={**KPI_STYLE_BOX, 'minWidth': '130px',
+                                    'borderLeft': f'3px solid {"#1A4731" if valid_r == total_r else "#FFAA00"}'}, children=[
+                        html.H3(f'{valid_r:,}',
+                                style={**KPI_STYLE_VALUE, 'fontSize': '22px',
+                                       'color': '#1A4731' if valid_r == total_r else '#AA6600'}),
+                        html.P(f'Valid Rows ({valid_r/total_r*100:.0f}% of total)' if total_r > 0 else 'Valid Rows',
+                               style={'color': TEXT_GRAY, 'fontSize': '11px',
+                                      'margin': '4px 0 0 0'}),
+                        html.P('Qty > 0, price computable',
+                               style={'color': TEXT_GRAY, 'fontSize': '10px',
+                                      'fontStyle': 'italic', 'margin': '2px 0 0 0'}),
+                    ]),
+                    # Zero quantity — only show if there are any
+                    *([html.Div(style={**KPI_STYLE_BOX, 'minWidth': '130px',
+                                       'borderLeft': '3px solid #C00000'}, children=[
+                        html.H3(f'{zero_r:,}',
+                                style={**KPI_STYLE_VALUE, 'fontSize': '22px',
+                                       'color': '#C00000'}),
+                        html.P('Zero Quantity',
+                               style={'color': TEXT_GRAY, 'fontSize': '11px',
+                                      'margin': '4px 0 0 0'}),
+                        html.P('Cannot compute price/unit',
+                               style={'color': TEXT_GRAY, 'fontSize': '10px',
+                                      'fontStyle': 'italic', 'margin': '2px 0 0 0'}),
+                    ])] if zero_r > 0 else []),
+                    # Blank unit — only show if there are any
+                    *([html.Div(style={**KPI_STYLE_BOX, 'minWidth': '130px'}, children=[
+                        html.H3(f'{blank_u:,}',
+                                style={**KPI_STYLE_VALUE, 'fontSize': '22px'}),
+                        html.P('Blank Unit',
+                               style={'color': TEXT_GRAY, 'fontSize': '11px',
+                                      'margin': '4px 0 0 0'}),
+                        html.P('No unit of measure',
+                               style={'color': TEXT_GRAY, 'fontSize': '10px',
+                                      'fontStyle': 'italic', 'margin': '2px 0 0 0'}),
+                    ])] if blank_u > 0 else []),
+                    html.Div(style={**KPI_STYLE_BOX, 'minWidth': '130px'}, children=[
+                        html.H3(f'{countries_n:,}',
+                                style={**KPI_STYLE_VALUE, 'fontSize': '22px',
+                                       'color': BLUE_ACCENT}),
+                        html.P('Countries',
+                               style={'color': TEXT_GRAY, 'fontSize': '11px',
+                                      'margin': '4px 0 0 0'}),
+                    ]),
+                ])
+            ]
+        )
+
         return html.Div(
             style={
-                'backgroundColor': WHITE,
-                'borderRadius':    '10px',
-                'padding':         '20px 24px',
-                'marginTop':       '16px',
-                'boxShadow':       '0 1px 4px rgba(0,0,0,0.07)',
-                'borderLeft':      f'4px solid {BLUE_ACCENT}',
+                'backgroundColor': WHITE, 'borderRadius': '10px',
+                'padding': '20px 24px', 'marginTop': '16px',
+                'boxShadow': '0 1px 4px rgba(0,0,0,0.07)',
+                'borderLeft': f'4px solid {BLUE_ACCENT}',
             },
             children=[
 
-                # Panel title
-                html.Div(style={'marginBottom': '16px'}, children=[
-                    html.H4(f'🔬  {short_name}',
-                            style={'margin': '0 0 4px 0', 'color': BLUE_ACCENT,
-                                   'fontSize': '15px', 'fontWeight': 'bold'}),
-                    html.P('Price distribution, trend, seasonality and trade partners',
-                           style={'margin': '0', 'color': TEXT_GRAY,
-                                  'fontSize': '12px', 'fontStyle': 'italic'}),
+                # Title row + data quality toggle button
+                html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
+                                'alignItems': 'flex-start', 'marginBottom': '12px'},
+                         children=[
+                    html.Div(children=[
+                        html.H4(f'🔬  {short_name}',
+                                style={'margin': '0 0 4px 0', 'color': BLUE_ACCENT,
+                                       'fontSize': '15px', 'fontWeight': 'bold'}),
+                        html.P('Price distribution, trend, seasonality and trade partners',
+                               style={'margin': '0', 'color': TEXT_GRAY,
+                                      'fontSize': '12px', 'fontStyle': 'italic'}),
+                    ]),
+                    html.Button('📊  Data Quality', id='data-quality-toggle',
+                                n_clicks=0,
+                                style={'backgroundColor': WHITE,
+                                       'border': f'1px solid {BLUE_ACCENT}',
+                                       'borderRadius': '6px', 'color': BLUE_ACCENT,
+                                       'cursor': 'pointer', 'fontSize': '12px',
+                                       'fontWeight': 'bold', 'padding': '6px 14px'}),
                 ]),
 
-                # KPI row
-                html.Div(
-                    style={**KPI_STYLE_ROW, 'margin': '0 0 20px 0'},
-                    children=[
-                        html.Div(style=KPI_STYLE_BOX, children=[
-                            html.H2(fmt_value(kpis['total_value']),
-                                    style=KPI_STYLE_VALUE),
-                            html.P('Total Trade Value',
-                                   style={'color': TEXT_GRAY, 'fontSize': '12px',
-                                          'margin': '4px 0 0 0'}),
-                        ]),
-                        html.Div(style=KPI_STYLE_BOX, children=[
-                            html.H2(f'{kpis["total_quantity"]:,.0f}',
-                                    style=KPI_STYLE_VALUE),
-                            html.P(f'Total Quantity ({kpis["unit"]})',
-                                   style={'color': TEXT_GRAY, 'fontSize': '12px',
-                                          'margin': '4px 0 0 0'}),
-                        ]),
-                        html.Div(style=KPI_STYLE_BOX, children=[
-                            html.H2(avg_price_str, style=KPI_STYLE_VALUE),
-                            html.P('Avg Price per Unit',
-                                   style={'color': TEXT_GRAY, 'fontSize': '12px',
-                                          'margin': '4px 0 0 0'}),
-                        ]),
-                        html.Div(style=KPI_STYLE_BOX, children=[
-                            html.H2(yoy_str,
-                                    style={**KPI_STYLE_VALUE, 'color': yoy_color}),
-                            html.P('YoY Price Change',
-                                   style={'color': TEXT_GRAY, 'fontSize': '12px',
-                                          'margin': '4px 0 0 0'}),
-                            html.P('vs same period prior year',
-                                   style={'color': TEXT_GRAY, 'fontSize': '10px',
-                                          'fontStyle': 'italic',
-                                          'margin': '2px 0 0 0'}),
-                        ]),
-                    ]
-                ),
+                # Trade direction banner
+                html.Div(style={'backgroundColor': dir_bg,
+                                'border': f'1px solid {dir_color}',
+                                'borderRadius': '6px', 'padding': '8px 14px',
+                                'marginBottom': '16px', 'fontSize': '13px',
+                                'color': dir_color, 'fontWeight': '500'},
+                         children=dir_text),
 
-                # Row 1: Histogram + Price over time + Seasonality
-                html.Div(
-                    style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
-                    children=[
-                        html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
-                            html.H4('Price Distribution', style=FIGURE_TITLE),
-                            html.P('Frequency of price per unit',
-                                   style=FIGURE_DESCRIPTION),
-                            dcc.Graph(
-                                figure=build_price_histogram(filtered,
-                                                             selected_commodity),
-                                config={'displayModeBar': False}
-                            ),
-                        ]),
-                        html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
-                            html.H4('Avg Price Over Time', style=FIGURE_TITLE),
-                            html.P('Monthly median price per unit',
-                                   style=FIGURE_DESCRIPTION),
-                            dcc.Graph(
-                                figure=build_price_over_time(filtered,
-                                                             selected_commodity),
-                                config={'displayModeBar': False}
-                            ),
-                        ]),
-                        html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
-                            html.H4('Seasonality', style=FIGURE_TITLE),
-                            html.P('Avg monthly trade value across years',
-                                   style=FIGURE_DESCRIPTION),
-                            dcc.Graph(
-                                figure=build_seasonality_chart(filtered,
-                                                               selected_commodity),
-                                config={'displayModeBar': False}
-                            ),
-                        ]),
-                    ]
-                ),
+                # KPI tiles
+                html.Div(style={**KPI_STYLE_ROW, 'margin': '0 0 20px 0'},
+                         children=kpi_tiles),
 
-                # Row 2: Export destinations + Import origins
-                html.Div(
-                    style={**STYLE_CHART_ROW, 'margin': '0'},
-                    children=[
-                        html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
-                            html.H4('Top Export Destinations', style=FIGURE_TITLE),
-                            html.P('Countries buying this commodity from Canada',
-                                   style=FIGURE_DESCRIPTION),
-                            dcc.Graph(
-                                figure=build_commodity_export_destinations(
-                                    filtered, selected_commodity),
-                                config={'displayModeBar': False}
-                            ),
-                        ]),
-                        html.Div(style={**STYLE_CHART_ITEM, 'flex': '1'}, children=[
-                            html.H4('Top Import Origins', style=FIGURE_TITLE),
-                            html.P('Countries supplying this commodity to Canada',
-                                   style=FIGURE_DESCRIPTION),
-                            dcc.Graph(
-                                figure=build_commodity_import_origins(
-                                    filtered, selected_commodity),
-                                config={'displayModeBar': False}
-                            ),
-                        ]),
-                    ]
-                ),
+                # Price charts or warning
+                price_row,
 
+                # Export/Import destinations
+                dest_row,
+
+                # Data quality panel (toggle)
+                data_quality,
             ]
         )
+
+    # ── Data quality panel toggle ─────────────────────────────────────────────
+    @app.callback(
+        Output('data-quality-panel', 'style'),
+        Output('data-quality-toggle', 'children'),
+        Output('data-quality-toggle', 'style'),
+        Input('data-quality-toggle', 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    def toggle_data_quality(n_clicks):
+        if n_clicks and n_clicks % 2 == 1:
+            return (
+                {'display': 'block'},
+                '📊  Hide Data Quality',
+                {'backgroundColor': BLUE_ACCENT, 'border': f'1px solid {BLUE_ACCENT}',
+                 'borderRadius': '6px', 'color': WHITE, 'cursor': 'pointer',
+                 'fontSize': '12px', 'fontWeight': 'bold', 'padding': '6px 14px'},
+            )
+        else:
+            return (
+                {'display': 'none'},
+                '📊  Data Quality',
+                {'backgroundColor': WHITE, 'border': f'1px solid {BLUE_ACCENT}',
+                 'borderRadius': '6px', 'color': BLUE_ACCENT, 'cursor': 'pointer',
+                 'fontSize': '12px', 'fontWeight': 'bold', 'padding': '6px 14px'},
+            )
