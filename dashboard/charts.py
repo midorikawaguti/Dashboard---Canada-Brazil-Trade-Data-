@@ -256,78 +256,37 @@ def build_top5_tables(filtered_df, full_df):
 # HS2 SHARE HORIZONTAL BAR
 # ══════════════════════════════════════════════════════════════════════════════
 def build_hs2_share_chart(filtered_df):
-    """
-    Horizontal grouped bar showing Export and Import value for each HS2 code,
-    with % share labels. Used on the Products page to show HS2 breakdown
-    within a selected section.
-    """
-    if filtered_df.empty:
+    total_all = filtered_df['Value ($)'].sum()
+    if total_all == 0:
         return go.Figure()
 
-    grouped = (
+    hs2 = (
         filtered_df
-        .groupby(['HS2', 'trade_type'], observed=True)['Value ($)']
+        .groupby('HS2', observed=True)['Value ($)']
         .sum().reset_index()
     )
-    if grouped.empty:
-        return go.Figure()
+    hs2['share'] = (hs2['Value ($)'] / total_all * 100).round(1)
+    hs2['label'] = hs2['HS2'].apply(lambda x: HS2_LABELS.get(str(x), str(x)))
+    hs2 = hs2.nlargest(10, 'share').sort_values('share')
 
-    # Top 10 HS2 by total
-    top10 = (
-        grouped.groupby('HS2', observed=True)['Value ($)']
-        .sum().nlargest(10).index.tolist()
-    )
-    grouped = grouped[grouped['HS2'].isin(top10)].copy()
-    total_all = grouped['Value ($)'].sum()
-    grouped['label'] = grouped['HS2'].apply(
-        lambda x: HS2_LABELS.get(str(x), str(x))
-    )
-
-    order = (
-        grouped.groupby('label')['Value ($)'].sum()
-        .sort_values(ascending=True).index.tolist()
-    )
-
-    exports = grouped[grouped['trade_type'] == 'Export'].set_index('label')
-    imports = grouped[grouped['trade_type'] == 'Import'].set_index('label')
-
-    exp_vals = [exports['Value ($)'].get(l, 0) for l in order]
-    imp_vals = [imports['Value ($)'].get(l, 0) for l in order]
-    exp_pcts = [round(v / total_all * 100, 1) if total_all > 0 else 0
-                for v in exp_vals]
-    imp_pcts = [round(v / total_all * 100, 1) if total_all > 0 else 0
-                for v in imp_vals]
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=order, x=exp_vals, name='Exports',
-        orientation='h', marker_color=EXPORT_COLOR,
-        text=[f'{p}%' for p in exp_pcts],
+    fig = go.Figure(go.Bar(
+        x=hs2['share'],
+        y=hs2['label'],
+        orientation='h',
+        text=hs2['share'].apply(lambda x: f'{x}%'),
         textposition='outside',
-        hovertemplate='%{y}<br>Exports: %{x:.2s} (%{text})<extra></extra>',
+        marker_color=COLORS_10[:len(hs2)],
+        # Store HS2 code in customdata so click callback can read it
+        customdata=hs2['HS2'].tolist(),
+        hovertemplate='<b>%{y}</b><br>Share: %{x}%<br>Click to filter<extra></extra>',
     ))
-    fig.add_trace(go.Bar(
-        y=order, x=imp_vals, name='Imports',
-        orientation='h', marker_color=IMPORT_COLOR,
-        text=[f'{p}%' for p in imp_pcts],
-        textposition='outside',
-        hovertemplate='%{y}<br>Imports: %{x:.2s} (%{text})<extra></extra>',
-    ))
-
-    max_val = max(max(exp_vals, default=0), max(imp_vals, default=0))
-    tick_vals = np.linspace(0, max_val, 5) if max_val > 0 else [0]
-
     fig.update_layout(
-        barmode='group',
-        xaxis=dict(
-            tickvals=tick_vals,
-            ticktext=[_fmt(v) for v in tick_vals],
-        ),
-        yaxis=dict(tickfont=dict(size=10)),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02),
-        margin=dict(l=0, r=80, t=30, b=10),
+        xaxis=dict(visible=False, range=[0, hs2['share'].max() * 1.20]),
+        yaxis=dict(tickfont=dict(size=12)),
+        margin=dict(l=0, r=60, t=10, b=10),
         template='plotly_white',
-        height=320,
+        showlegend=False,
+        clickmode='event+select',
     )
     return fig
 
@@ -353,6 +312,9 @@ def build_province_small_multiples(filtered_df):
         subplot_titles=[p if p else '' for p in top4],
     )
 
+    # Collect total values to add as centre annotations after layout
+    totals = []
+
     for i, province in enumerate(top4):
         col = i + 1
         if province is None:
@@ -361,13 +323,15 @@ def build_province_small_multiples(filtered_df):
                 marker_colors=['#E0E0E0'],
                 hole=0.6, showlegend=False, textinfo='none',
             ), row=1, col=col)
+            totals.append(None)
             continue
 
-        sub    = filtered_df[filtered_df['Province'] == province]
-        split  = sub.groupby('trade_type', observed=True)['Value ($)'].sum()
+        sub     = filtered_df[filtered_df['Province'] == province]
+        split   = sub.groupby('trade_type', observed=True)['Value ($)'].sum()
         exports = split.get('Export', 0)
         imports = split.get('Import', 0)
         total   = exports + imports
+        totals.append(total)
 
         fig.add_trace(go.Pie(
             values=[exports, imports],
@@ -384,26 +348,41 @@ def build_province_small_multiples(filtered_df):
             ),
         ), row=1, col=col)
 
-        fig.add_annotation(
-            text=f'<b>{fmt_value(total)}</b>',
-            x=0.125 + i * 0.25, y=0.5,
-            showarrow=False,
-            font=dict(size=11, color='#1A1A1A'),
-            xref='paper', yref='paper',
-        )
-
+    # Build layout first so subplot title annotations are already set
     fig.update_layout(
         template='plotly_white',
         margin=dict(t=40, b=20, l=0, r=0),
-        height=280,
+        height=300,
         legend=dict(orientation='h', yanchor='bottom', y=-0.15,
                     xanchor='center', x=0.5),
-        annotations=[
-            {**a, 'font': dict(size=13, color='#1F4E79', family='Arial')}
-            if a.get('text') else a
-            for a in fig.to_dict()['layout'].get('annotations', [])
-        ],
     )
+
+    # Style subtitle annotations (province names) — these are auto-generated
+    # by make_subplots and sit at y≈1.0 in paper coords
+    for ann in fig.layout.annotations:
+        ann.font = dict(size=12, color='#1F4E79', family='Arial')
+
+    # Add total value annotations centred inside each donut hole
+    # x midpoints read directly from Plotly domain computation:
+    # subplot 1=0.1062, 2=0.3688, 3=0.6313, 4=0.8938
+    # y midpoint is always 0.5 (full height domain)
+    X_MIDS = [0.1062, 0.3688, 0.6313, 0.8938]
+
+    for i, total in enumerate(totals):
+        if total is None:
+            continue
+        fig.add_annotation(
+            text=f'<b>{fmt_value(total)}</b>',
+            x=X_MIDS[i],
+            y=0.5,
+            xref='paper',
+            yref='paper',
+            xanchor='center',
+            yanchor='middle',
+            showarrow=False,
+            font=dict(size=12, color='#1A1A1A', family='Arial'),
+        )
+
     return fig
 
 
@@ -461,12 +440,16 @@ def build_top_partners_bar(filtered_kpi):
         hovertemplate='%{y}<br>%{x:.2s}<extra></extra>',
     ))
     fig.update_layout(
-        xaxis=dict(tickvals=tick_vals, ticktext=[_fmt(v) for v in tick_vals],
-                   visible=False),
+        xaxis=dict(
+            tickvals=tick_vals,
+            ticktext=[_fmt(v) for v in tick_vals],
+            visible=False,
+            range=[0, top['Value ($)'].max() * 1.1],  # extra space for labels
+        ),
         yaxis=dict(tickfont=dict(size=11)),
         template='plotly_white',
-        margin=dict(t=10, b=10, l=0, r=60),
-        height=240,
+        margin=dict(t=10, b=10, l=0, r=10),
+        height=320,  # match province donut chart height
     )
     return fig
 
@@ -475,11 +458,6 @@ def build_top_partners_bar(filtered_kpi):
 # HS2 TREEMAP — two-level: Section → HS2
 # ══════════════════════════════════════════════════════════════════════════════
 def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None):
-    """
-    Two-level treemap: Section (parent) → HS2 description (child).
-    Top level always shows Sections. Clicking a Section reveals its HS2 codes.
-    When hs2_to_section/description not provided, falls back to flat HS2 view.
-    """
     hs2 = (
         filtered_kpi
         .groupby('HS2', observed=True)['Value ($)']
@@ -491,47 +469,27 @@ def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None
     hs2['hs2_str'] = hs2['HS2'].astype(str).str.zfill(2)
 
     if hs2_to_section and hs2_to_description:
+        # Two-level treemap: Section → HS2
         hs2['section']     = hs2['hs2_str'].map(hs2_to_section).fillna('Other')
         hs2['description'] = hs2['hs2_str'].map(hs2_to_description).fillna(hs2['hs2_str'])
 
         section_totals = hs2.groupby('section')['Value ($)'].sum().reset_index()
         total = hs2['Value ($)'].sum()
 
-        # Section level (parents = '') + HS2 level (parents = section name)
         labels  = section_totals['section'].tolist() + hs2['description'].tolist()
         parents = [''] * len(section_totals) + hs2['section'].tolist()
         values  = section_totals['Value ($)'].tolist() + hs2['Value ($)'].tolist()
-        ids     = section_totals['section'].tolist() + \
-                  (hs2['section'] + ' / ' + hs2['description']).tolist()
         pcts    = [round(v / total * 100, 1) for v in values]
-
-        # Colour sections distinctly
-        section_colors = [
-            '#264653','#2A9D8F','#52B788','#84A59D','#E9C46A',
-            '#F4A261','#E76F51','#D62828','#6D597A','#457B9D',
-            '#1A4731','#A8DADC','#457B9D','#E63946','#F1FAEE',
-            '#A8C4E0','#2B2D42','#8D99AE',
-        ]
-        section_list   = section_totals['section'].tolist()
-        section_color_map = {s: section_colors[i % len(section_colors)]
-                             for i, s in enumerate(section_list)}
-
-        marker_colors = [section_color_map.get(s, '#457B9D')
-                         for s in section_list] + \
-                        [section_color_map.get(s, '#457B9D')
-                         for s in hs2['section'].tolist()]
     else:
+        # Flat treemap fallback using HS2_LABELS
         hs2['label'] = hs2['hs2_str'].apply(lambda x: HS2_LABELS.get(x, x))
-        total   = hs2['Value ($)'].sum()
+        total  = hs2['Value ($)'].sum()
         labels  = hs2['label'].tolist()
-        ids     = hs2['label'].tolist()
         parents = [''] * len(hs2)
         values  = hs2['Value ($)'].tolist()
-        pcts    = [round(v / total * 100, 1) for v in values]
-        marker_colors = COLORS_10[:len(hs2)]
+        pcts    = [(v / total * 100) for v in values]
 
     fig = go.Figure(go.Treemap(
-        ids=ids,
         labels=labels,
         parents=parents,
         values=values,
@@ -542,73 +500,17 @@ def build_hs2_treemap(filtered_kpi, hs2_to_section=None, hs2_to_description=None
             'Value: %{value:.2s}<br>'
             'Share: %{customdata:.1f}%<extra></extra>'
         ),
-        marker=dict(colors=marker_colors, showscale=False),
+        marker=dict(colorscale='Teal', showscale=False),
         textfont=dict(size=11, color='white'),
         branchvalues='total',
-        maxdepth=1,   # start at Section level — click to expand
     ))
     fig.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
-        height=300,
+        height=260,
     )
     return fig
-# ══════════════════════════════════════════════════════════════════════════════
-# HS2 BAR CHART — two-level: Section → HS2
-# ══════════════════════════════════════════════════════════════════════════════
-def build_section_bar_chart(filtered_kpi, hs2_to_section=None):
-    """
-    Horizontal bar chart showing total trade value and % share
-    for each HS2 Section. Replaces the treemap.
-    """
-    hs2 = (
-        filtered_kpi
-        .groupby('HS2', observed=True)['Value ($)']
-        .sum().reset_index()
-    )
-    if hs2.empty:
-        return go.Figure()
 
-    hs2['hs2_str'] = hs2['HS2'].astype(str).str.zfill(2)
 
-    if hs2_to_section:
-        hs2['section'] = hs2['hs2_str'].map(hs2_to_section).fillna('Other')
-        grouped = hs2.groupby('section')['Value ($)'].sum().reset_index()
-        grouped.columns = ['Section', 'Value']
-    else:
-        hs2['section'] = hs2['hs2_str'].apply(lambda x: HS2_LABELS.get(x, x))
-        grouped = hs2.rename(columns={'section': 'Section', 'Value ($)': 'Value'})
-
-    total = grouped['Value'].sum()
-    grouped['pct'] = (grouped['Value'] / total * 100).round(1)
-    grouped = grouped.sort_values('Value', ascending=True)
-
-    fig = go.Figure(go.Bar(
-        y=grouped['Section'],
-        x=grouped['Value'],
-        orientation='h',
-        marker_color=COLORS_10 * (len(grouped) // len(COLORS_10) + 1),
-        text=[f'{_fmt(v)}  ({p}%)' for v, p in
-              zip(grouped['Value'], grouped['pct'])],
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Value: %{x:.2s}<br>Share: %{text}<extra></extra>',
-    ))
-
-    max_val = grouped['Value'].max()
-    tick_vals = np.linspace(0, max_val, 5)
-
-    fig.update_layout(
-        xaxis=dict(
-            tickvals=tick_vals,
-            ticktext=[_fmt(v) for v in tick_vals],
-            visible=False,
-        ),
-        yaxis=dict(tickfont=dict(size=11)),
-        template='plotly_white',
-        margin=dict(l=0, r=160, t=10, b=10),
-        height=360,
-        showlegend=False,
-    )
-    return fig
 # ══════════════════════════════════════════════════════════════════════════════
 # TRADE BALANCE BY PROVINCE — diverging bar
 # ══════════════════════════════════════════════════════════════════════════════
@@ -713,6 +615,9 @@ def build_import_origins(filtered_df):
 # ══════════════════════════════════════════════════════════════════════════════
 def build_key_insights(*args, **kwargs):
     return go.Figure()
+
+
+
 
 
 """
@@ -968,11 +873,22 @@ def build_commodity_import_origins(filtered_df, commodity_name):
         (filtered_df['trade_type'] == 'Import')
     ]
     if sub.empty:
-        return go.Figure()
+        fig = go.Figure()
+        fig.add_annotation(
+            text='No import data for this commodity<br>in the selected period and filters',
+            x=0.5, y=0.5, xref='paper', yref='paper',
+            showarrow=False, xanchor='center', yanchor='middle',
+            font=dict(size=13, color='#999999'),
+        )
+        fig.update_layout(
+            template='plotly_white', height=260,
+            xaxis=dict(visible=False), yaxis=dict(visible=False)
+        )
+        return fig
 
     top = (
         sub.groupby('Country', observed=True)['Value ($)']
-        .sum().nlargest(8).reset_index()
+        .sum().nlargest(10).reset_index()
         .sort_values('Value ($)', ascending=True)
     )
     tick_vals = np.linspace(0, top['Value ($)'].max(), 5)
@@ -994,18 +910,15 @@ def build_commodity_import_origins(filtered_df, commodity_name):
     )
     return fig
 
-"""
-============================================================
-Butterfly Chart
-============================================================
-"""
-
+# ══════════════════════════════════════════════════════════════════════════════
+# BUTTERFLY CHART — back-to-back horizontal bar by HS2 Section
+# ══════════════════════════════════════════════════════════════════════════════
 def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
     """
     Butterfly (back-to-back) horizontal bar chart.
-    Imports go LEFT, Exports go RIGHT.
+    Imports go LEFT (negative x), Exports go RIGHT (positive x).
     Selected section is highlighted, others dimmed.
-    Clicking a bar syncs to the section dropdown.
+    Clicking a bar syncs to the section dropdown via callback.
     """
     hs2 = (
         filtered_kpi
@@ -1049,7 +962,6 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
 
     sections = pivot['section'].tolist()
 
-    # Highlight selected section, dim others
     def imp_color(s):
         if selected_section is None:
             return '#2C5F8A'
@@ -1062,7 +974,7 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
 
     fig = go.Figure()
 
-    # ── Imports (left side — negative x) ──────────────────────────────────────
+    # Imports — left side (negative x)
     fig.add_trace(go.Bar(
         y=sections,
         x=[-v for v in pivot['Import']],
@@ -1086,7 +998,7 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
         ),
     ))
 
-    # ── Exports (right side — positive x) ─────────────────────────────────────
+    # Exports — right side (positive x)
     fig.add_trace(go.Bar(
         y=sections,
         x=pivot['Export'],
@@ -1111,7 +1023,7 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
     ))
 
     max_val   = max(pivot['Export'].max(), pivot['Import'].max())
-    tick_vals = list(np.linspace(-max_val, max_val, 9))
+    tick_vals = list(np.linspace(-max_val*1.3, max_val*1.3, 9))
     tick_text = [_fmt(abs(v)) for v in tick_vals]
 
     fig.update_layout(
@@ -1140,34 +1052,32 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
                  text='<b>EXPORTS</b>',
                  font=dict(size=14, color='#1A4731')),
             # Footer summary
-            dict(x=0.10, y=-0.10, xref='paper', yref='paper',
+            dict(x=0.10, y=-0.18, xref='paper', yref='paper',
                  showarrow=False, align='center',
                  text=f'<b>Total Imports</b><br>'
                       f'<span style="font-size:15px"><b>{_fmt(total_imp)}</b></span><br>'
                       f'<span style="color:gray">({total_imp/total_all*100:.1f}%)</span>',
                  font=dict(size=11, color='#2C5F8A')),
-            dict(x=0.36, y=-0.10, xref='paper', yref='paper',
-                 showarrow=False, align='center',
-                 text=f'<b>Total Trade</b><br>'
-                      f'<span style="font-size:15px"><b>{_fmt(total_all)}</b></span><br>'
-                      f'<span style="color:gray">(100%)</span>',
-                 font=dict(size=11, color='#333333')),
-            dict(x=0.63, y=-0.10, xref='paper', yref='paper',
+            # dict(x=0.36, y=-0.18, xref='paper', yref='paper',
+            #      showarrow=False, align='center',
+            #      text=f'<b>Total Trade</b><br>'
+            #           f'<span style="font-size:15px"><b>{_fmt(total_all)}</b></span><br>'
+            #           f'<span style="color:gray">(100%)</span>',
+            #      font=dict(size=11, color='#333333')),
+            dict(x=0.5, y=-0.18, xref='paper', yref='paper',
                  showarrow=False, align='center',
                  text=f'<b>Total Exports</b><br>'
                       f'<span style="font-size:15px"><b>{_fmt(total_exp)}</b></span><br>'
                       f'<span style="color:gray">({total_exp/total_all*100:.1f}%)</span>',
                  font=dict(size=11, color='#1A4731')),
-            dict(x=0.88, y=-0.10, xref='paper', yref='paper',
+            dict(x=0.88, y=-0.18, xref='paper', yref='paper',
                  showarrow=False, align='center',
                  text=f'<b>Trade Balance</b><br>'
                       f'<span style="font-size:15px"><b>{bal_str}</b></span>',
                  font=dict(size=11, color=bal_color)),
         ],
-        margin=dict(t=60, b=110, l=0, r=180),
+        margin=dict(t=60, b=110, l=0, r=40),
         height=max(500, len(sections) * 30 + 180),
         clickmode='event+select',
     )
     return fig
-
-
