@@ -1,4 +1,4 @@
-from dash import html, dcc, Input, Output, State, ctx, ctx
+from dash import html, dcc, Input, Output, ctx
 
 from .data import df, df_kpi, df_kpi_commodity, period_index, \
                   hs2_to_section, hs2_to_description
@@ -25,6 +25,7 @@ from .charts import (
     build_seasonality_chart,
     build_commodity_export_destinations,
     build_commodity_import_origins,
+    build_commodity_province_lines,
     build_butterfly_chart
 )
 from .styles import (
@@ -222,10 +223,11 @@ def register_callbacks(app):
         return current_hs2
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PRODUCTS — LEVEL 2: HS2 dropdown options (never touches value)
+    # PRODUCTS — LEVEL 2: HS2 dropdown options based on selected section
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-hs2-select', 'options'),
+        Output('products-hs2-select', 'value'),
         Input('products-section-select', 'value'),
         Input('period-slider',           'value'),
         Input('province-dropdown',       'value'),
@@ -233,6 +235,7 @@ def register_callbacks(app):
     )
     def update_hs2_options(selected_section, period_range,
                            selected_province, selected_trade_type):
+        """Populate HS2 dropdown with codes that belong to the selected section."""
         hs2_filter = get_hs2_codes_for_section(selected_section, hs2_to_section)
 
         filtered = apply_filters(
@@ -242,23 +245,17 @@ def register_callbacks(app):
         )
 
         if filtered.empty:
-            return []
+            return [], None
 
+        # Get HS2 codes present in filtered data
         available_hs2 = filtered['HS2'].unique().tolist()
-        return [
+
+        options = [
             {'label': f"{code} – {HS2_LABELS.get(str(code), str(code))}",
              'value': code}
             for code in sorted(available_hs2)
         ]
-
-    # Reset HS2 value ONLY when section changes
-    @app.callback(
-        Output('products-hs2-select', 'value'),
-        Input('products-section-select', 'value'),
-        prevent_initial_call=True,
-    )
-    def reset_hs2_on_section_change(_):
-        return None
+        return options, None   # reset HS2 selection when section changes
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRODUCTS — Main charts/KPIs (update on section OR hs2 selection)
@@ -407,21 +404,23 @@ def register_callbacks(app):
     # ══════════════════════════════════════════════════════════════════════════
     @app.callback(
         Output('products-commodity-select', 'options'),
+        Output('products-commodity-select', 'value'),
         Input('period-slider',          'value'),
         Input('province-dropdown',      'value'),
-        Input('country-dropdown',       'value'),
         Input('trade-type-dropdown',    'value'),
-        Input('products-hs2-select',    'value'),
-        Input('products-section-select','value'),
+        Input('products-hs2-select',    'value'),   # Level 2
+        Input('products-section-select','value'),   # Level 1 fallback
     )
     def update_commodity_options(period_range, selected_province,
-                                 selected_country, selected_trade_type,
-                                 selected_hs2, selected_section):
+                                 selected_trade_type, selected_hs2,
+                                 selected_section):
+        # Use HS2 filter if selected, else use section filter
         if selected_hs2:
             hs2_filter = [selected_hs2]
         else:
             hs2_filter = get_hs2_codes_for_section(selected_section, hs2_to_section)
 
+        # Filter df (has HS2 column), then re-aggregate to commodity level
         filtered_raw = apply_filters(
             df, period_range, hs2_filter,
             selected_province, None,
@@ -436,7 +435,7 @@ def register_callbacks(app):
         )
 
         if filtered.empty:
-            return []
+            return [], None
 
         top_commodities = (
             filtered
@@ -445,18 +444,9 @@ def register_callbacks(app):
             .nlargest(200)
             .index.tolist()
         )
-        return [{'label': str(c)[:60], 'value': c}
-                for c in sorted(top_commodities)]
-
-    # Reset commodity value ONLY when section or HS2 changes
-    @app.callback(
-        Output('products-commodity-select', 'value'),
-        Input('products-section-select', 'value'),
-        Input('products-hs2-select',     'value'),
-        prevent_initial_call=True,
-    )
-    def reset_commodity_on_drill_change(_, __):
-        return None
+        options = [{'label': str(c)[:60], 'value': c}
+                   for c in sorted(top_commodities)]
+        return options, None
 
     # ══════════════════════════════════════════════════════════════════════════
     # PRODUCTS — LEVEL 3: Commodity detail panel
@@ -466,19 +456,17 @@ def register_callbacks(app):
         Input('products-commodity-select', 'value'),
         Input('period-slider',             'value'),
         Input('province-dropdown',         'value'),
-        Input('country-dropdown',          'value'),
         Input('trade-type-dropdown',       'value'),
     )
     def update_commodity_detail(selected_commodity, period_range,
-                                selected_province, selected_country,
-                                selected_trade_type):
+                                selected_province, selected_trade_type):
 
         if not selected_commodity:
             return html.Div()
 
         filtered = apply_filters(
             df, period_range, None,
-            selected_province, selected_country,
+            selected_province, None,
             selected_trade_type, period_index=period_index
         )
 
@@ -604,6 +592,25 @@ def register_callbacks(app):
             ]))
         dest_row = html.Div(style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'}, children=dest_children)
 
+        # ── Province line chart ────────────────────────────────────────────────
+        province_line_row = html.Div(
+            style={**STYLE_CHART_ROW, 'margin': '0 0 16px 0'},
+            children=[
+                html.Div(style=STYLE_CHART_ITEM, children=[
+                    html.H4('Trade by Province Over Time', style=FIGURE_TITLE),
+                    html.P(
+                        'Monthly trade value per province — top 8 provinces by total value',
+                        style=FIGURE_DESCRIPTION
+                    ),
+                    dcc.Graph(
+                        figure=build_commodity_province_lines(
+                            filtered, selected_commodity),
+                        config={'displayModeBar': False},
+                    ),
+                ]),
+            ]
+        )
+
         # ── Data quality stats ─────────────────────────────────────────────────
         total_r     = len(sub)
         valid_r     = len(sub[sub['Quantity'] > 0])
@@ -688,6 +695,9 @@ def register_callbacks(app):
 
                 # Export/Import destinations
                 dest_row,
+
+                # Province trade over time
+                province_line_row,
 
                 # Data quality panel (toggle)
                 data_quality,

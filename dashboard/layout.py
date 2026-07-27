@@ -1,6 +1,6 @@
 from dash import html, dcc
 
-from .data import df, date_range_label, period_labels
+from .data import df, date_range_label, period_labels, default_start_index
 from .styles import (
     DARK_GREEN, WHITE, LIGHT_GRAY, MID_GRAY,
     FONT_BODY,
@@ -232,7 +232,7 @@ def create_layout():
                                         min=0,
                                         max=len(period_labels) - 1,
                                         step=1,
-                                        value=[0, len(period_labels) - 1],
+                                        value=[default_start_index, len(period_labels) - 1],
                                         marks={
                                             i: {'label': label,
                                                 'style': {'fontSize': '10px'}}

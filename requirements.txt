@@ -1,6 +1,7 @@
 dash
 plotly
-gunicorn
 pandas
-numpy
 pyarrow
+numpy
+requests
+gunicorn

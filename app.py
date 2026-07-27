@@ -1,3 +1,8 @@
+
+from download_data import ensure_data
+ensure_data()
+
+
 import dash
 
 from dashboard.layout import create_layout

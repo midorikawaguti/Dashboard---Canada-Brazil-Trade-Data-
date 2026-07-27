@@ -48,3 +48,8 @@ hs2_options_labeled = [
 periods       = sorted(df['Period'].dt.to_period('M').unique())
 period_labels = [p.strftime('%b %Y') for p in periods]
 period_index  = {i: p for i, p in enumerate(periods)}
+
+default_start_index = next(
+    (i for i, p in period_index.items() if str(p) == '2025-01'),
+    0   # fallback to 0 if Jan 2025 not found
+)

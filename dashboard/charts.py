@@ -1081,3 +1081,122 @@ def build_butterfly_chart(filtered_kpi, hs2_to_section, selected_section=None):
         clickmode='event+select',
     )
     return fig
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMMODITY PROVINCE LINE CHART
+# One line per province showing trade value over time for a specific commodity.
+# Shows Export and/or Import depending on what data exists.
+# ══════════════════════════════════════════════════════════════════════════════
+def build_commodity_province_lines(filtered_df, commodity_name):
+    """
+    Line chart — one line per province — showing monthly trade value
+    for a specific commodity. Separates Export and Import into subplots
+    when both exist.
+    """
+    sub = filtered_df[filtered_df['Commodity'] == commodity_name].copy()
+    if sub.empty:
+        return go.Figure()
+
+    has_exports = not sub[sub['trade_type'] == 'Export'].empty
+    has_imports = not sub[sub['trade_type'] == 'Import'].empty
+
+    types_to_show = []
+    if has_exports:
+        types_to_show.append('Export')
+    if has_imports:
+        types_to_show.append('Import')
+
+    if not types_to_show:
+        return go.Figure()
+
+    cols      = len(types_to_show)
+    subtitles = [f'{t}s by Province' for t in types_to_show]
+
+    fig = make_subplots(
+        rows=1, cols=cols,
+        subplot_titles=subtitles,
+        shared_yaxes=False,
+    )
+
+    PROVINCE_COLORS = [
+        '#1A4731', '#2A9D8F', '#52B788', '#E9C46A', '#F4A261',
+        '#E76F51', '#457B9D', '#264653', '#6D597A', '#D62828',
+        '#2C5F8A', '#84A98C', '#84A59D',
+    ]
+
+    for col_idx, trade_type in enumerate(types_to_show):
+        col = col_idx + 1
+        sub_t = sub[sub['trade_type'] == trade_type].copy()
+
+        # Monthly totals per province
+        sub_t['year']  = sub_t['Period'].dt.year
+        sub_t['month'] = sub_t['Period'].dt.month
+        monthly = (
+            sub_t.groupby(['year', 'month', 'Province'], observed=True)['Value ($)']
+            .sum()
+            .reset_index()
+            .sort_values(['year', 'month'])
+        )
+        monthly['label'] = monthly.apply(
+            lambda r: f"{calendar.month_abbr[int(r['month'])]} {int(r['year'])}",
+            axis=1
+        )
+
+        # Top 8 provinces by total value to keep the chart readable
+        top_provinces = (
+            monthly.groupby('Province', observed=True)['Value ($)']
+            .sum()
+            .nlargest(8)
+            .index.tolist()
+        )
+
+        for i, province in enumerate(top_provinces):
+            prov_data = monthly[monthly['Province'] == province]
+            fig.add_trace(go.Scatter(
+                x=prov_data['label'],
+                y=prov_data['Value ($)'],
+                name=province,
+                mode='lines+markers',
+                line=dict(color=PROVINCE_COLORS[i % len(PROVINCE_COLORS)], width=2),
+                marker=dict(size=4),
+                legendgroup=province,
+                showlegend=(col_idx == 0),  # only show legend once
+                hovertemplate=(
+                    f'<b>{province}</b><br>'
+                    '%{x}<br>'
+                    'Value: %{y:.2s}<extra></extra>'
+                ),
+            ), row=1, col=col)
+
+        # Format y axis
+        fig.update_yaxes(
+            tickprefix='$',
+            tickformat='~s',
+            gridcolor='#F0F0F0',
+            row=1, col=col,
+        )
+        fig.update_xaxes(
+            tickangle=-30,
+            tickfont=dict(size=9),
+            row=1, col=col,
+        )
+
+    # Style subplot titles
+    fig.update_layout(
+        template='plotly_white',
+        margin=dict(t=50, b=60, l=60, r=20),
+        height=340,
+        legend=dict(
+            orientation='v',
+            yanchor='middle', y=0.5,
+            xanchor='left', x=1.01,
+            font=dict(size=10),
+            title=dict(text='Province', font=dict(size=11)),
+        ),
+        hovermode='x unified',
+    )
+
+    for ann in fig.layout.annotations:
+        ann.font = dict(size=12, color='#1F4E79', family='Arial')
+
+    return fig
