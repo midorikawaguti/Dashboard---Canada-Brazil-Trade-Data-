@@ -65,7 +65,7 @@ mkdir Dataset
 ```
 Download these two files and move them into the Dataset/ folder:
 - [Dataset.parquet](https://drive.google.com/file/d/1R4r91J0yXeSTOTPAl6TqU3P8l8VR-raC/view?usp=drive_link)
-- [HS2_Sections_With_Descriptions.csv] (https://drive.google.com/file/d/10Lo2xZCCLgfyAq0ikJDUH2sAvbh_vdFb/view?usp=drive_link)
+- [HS2_Sections_With_Descriptions.csv](https://drive.google.com/file/d/10Lo2xZCCLgfyAq0ikJDUH2sAvbh_vdFb/view?usp=drive_link)
 
 #### Step 5 — Run the dashboard
 ```bash
