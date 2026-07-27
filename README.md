@@ -5,7 +5,7 @@
 - Overview page — Total exports, imports, trade balance, top trading partners, province breakdown
 - Products page — HS2 commodity drill-down, butterfly chart, section/HS2/commodity filters
 - Commodity detail — Price trends, seasonality, export destinations, import origins, province breakdown over time
-- Filters — Province, Country, Trade Type, Period slider (Jan 2024 – May 2026)
+- Filters — Province, Country, Trade Type, Period slider (Jan 2024 – Dec 2025)
 
 ```text
 .
