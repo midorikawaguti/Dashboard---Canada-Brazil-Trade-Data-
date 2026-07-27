@@ -5,3 +5,4 @@ pyarrow
 numpy
 requests
 gunicorn
+gdown
