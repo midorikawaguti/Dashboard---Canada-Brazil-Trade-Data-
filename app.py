@@ -1,8 +1,3 @@
-
-from download_data import ensure_data
-ensure_data()
-
-
 import dash
 
 from dashboard.layout import create_layout
@@ -14,8 +9,6 @@ server = app.server  # 👈 REQUIRED for deployment
 app.layout = create_layout()
 register_callbacks(app)
 
-# if __name__ == '__main__':
-#     app.run_server(host='0.0.0.0', port=8050)
 
 if __name__ == '__main__':
     app.run(debug=True, port=8050)
