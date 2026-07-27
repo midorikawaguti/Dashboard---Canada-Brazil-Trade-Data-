@@ -29,7 +29,7 @@
 
 ### Statistics Canada — Canadian International Merchandise Trade (CIMT)
 
-- Period: January 2024 – May 2026
+- Period: January 2024 – Dec 2025
 - ~12 million rows of commodity-level trade transactions
 - Provinces, countries, HS8/HS10 commodity codes, export and import values
 - [View data source](https://www150.statcan.gc.ca/n1/pub/71-607-x/2021004/exp-eng.htm)
