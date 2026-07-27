@@ -26,7 +26,7 @@ def ensure_data():
 
     import gdown   # guaranteed to be installed via requirements.txt
     url = f'https://drive.google.com/uc?id={GDRIVE_FILE_ID}'
-    gdown.download(url, str(DATASET_PATH), quiet=False, fuzzy=True)
+    gdown.download(url, str(DATASET_PATH), quiet=False)
 
     # Validate
     if not DATASET_PATH.exists():
